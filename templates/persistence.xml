@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--  The build process should place this file in the source META-INF directory,
+      and it shoud be included in the generated jar fiie.
+-->
+<persistence xmlns="http://java.sun.com/xml/ns/persistence"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://java.sun.com/xml/ns/persistence
+      http://java.sun.com/xml/ns/persistence/persistence_1_0.xsd"
+  version="1.0">
+    <!-- JTA version -->
+    <!--
+    <persistence-unit name="default" transaction-type="JTA">
+        <jta-data-source>@jta.data.source@</jta-data-source>
+    -->
+    <persistence-unit name="default">
+        <provider>org.hibernate.ejb.HibernatePersistence</provider>
+        <class>com.saliman.entitypruner.testhelper.BaseEntity</class>
+        <class>com.saliman.entitypruner.testhelper.AuditableEntity</class>
+        <class>com.saliman.entitypruner.testhelper.TestParentEntity</class>
+        <class>com.saliman.entitypruner.testhelper.TestChildEntity</class>
+        <class>com.saliman.entitypruner.testhelper.TestUniChildEntity</class>
+
+        <properties>
+            <property name="hibernate.cache.provider_class" 
+                      value="net.sf.ehcache.hibernate.EhCacheProvider"/>
+            <property name="hibernate.cache.use_second_level_cache" value="true"/>
+            <property name="hibernate.cache.use_query_cache" value="false"/>
+            <property name="hibernate.dialect" 
+                      value="org.hibernate.dialect.Oracle10gDialect"/>
+            <property name="hibernate.generate_statistics" value="true"/>
+            <property name="hibernate.jdbc.batch_size" value="15"/>
+            <property name="hibernate.jdbc.fetch_size" value="50"/>
+            <property name="hibernate.show.sql" value="@hibernate.show.sql@"/>
+
+        </properties>
+    </persistence-unit>
+</persistence>

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This is the main Spring configuration file for unit tests. -->
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+             http://www.springframework.org/schema/beans/spring-beans-2.5.xsd">
+    <!-- 
+        This the the test version of the main Spring configuration file. It is 
+        the root of the Spring configuration. This file should not be modified.
+        The only beans that belong in this file are the property configurer, 
+        and any beans that need to be part of the test configuration, that 
+        aren't in the production one, such as unit testing DAOs. Framework 
+        beans are defined in framework.xml and framework-security.xml. Database
+        connectivity beans are defined in db-container.xml and
+        db-nocontainer.xml.
+        
+        Specify application beans (such as Tasks, Workflows, DAOs, etc) in  
+        specific files (such as task.xml, workflow.xml, dao.xml, etc), and
+        import those files in the import section.
+        
+        To enable JMX monitoring using the Framework, uncomment the import 
+        reference to framework-jmx.xml
+        
+        The Framework (in framework.xml) provides the following bean ids and 
+        types which can be used in the rest of the Spring configuration:
+            application - the universal refernce point of a Spring Application
+                          Context within the application
+            encrypter - an encrypter implementation used to decrypt data
+            decrypter - a decrypter implementation used to decrypt data
+            securityLog - the bean to use for security-related logging.
+            entityDao - a generic DAO implementation for saving or deleting
+                        entities without creating a special DAO for each type
+                        in the applicaiton. This is useful when you need to
+                        delete members of a child collection, but you don't do
+                        anything else with that type of entity.
+            workflowTimingDao - a DAO implemenation for saving Workflow 
+                                execution stats. This will be provided to 
+                                application create workflows
+
+        Other beans exist in the framwork.xml file, but these are the ones 
+        you'll be interacting with.
+        
+        The Framework depends upon the following variables being defined:
+        
+            jdbc.driverClassName - the JDBC driver to use if there is a 
+                                   JDBC database connection. Not used for JTA
+          
+            jdbc.url - the database connection string if there is a JDBC 
+                       database connection. Not used for JTA
+        
+            jdbc.username - the database user id if there is a JDBC database 
+                            connection. Not used for JTA
+        
+            jdbc.password - the database password if there is a JDBC database 
+                            connection. Not used for JTA.
+    -->
+    
+    <!--===================== IMPORT SECTION ============================== -->
+    <!-- import other configuration files here. Do NOT import 
+         framework-security.xml unless you want a lot of bogus application
+         startup and shutdown events firing. -->
+    <import resource="classpath:db-nocontainer.xml"/>
+    <!--  import resource="classpath:framework-sercurity.xml"/ -->
+    <!-- import resource="classpath:framework-jmx.xml"/-->
+    
+    <!-- Configurer that replaces ${...} placeholders with values from 
+         properties files. The framework version decrypts values that start
+         with "{aes}" -->
+    <bean id="propertyConfigurer"
+          class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+    <property name="locations">
+        <list>
+            <value>env.properties</value>
+        </list>
+        </property>
+    </bean>
+
+    <bean id="testParentDaoJpa"
+        class="com.saliman.entitypruner.testhelper.TestParentDaoJpa"
+        scope="singleton">
+    </bean>
+
+    <bean id="testChildDaoJpa"
+        class="com.saliman.entitypruner.testhelper.TestChildDaoJpa"
+        scope="singleton">
+    </bean>
+
+    <bean id="testUniChildDaoJpa"
+        class="com.saliman.entitypruner.testhelper.TestUniChildDaoJpa"
+        scope="singleton">
+    </bean>
+</beans>
