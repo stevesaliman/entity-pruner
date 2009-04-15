@@ -1,5 +1,7 @@
 package com.saliman.entitypruner;
 
+import java.io.Serializable;
+import java.math.BigInteger;
 
 /**
  * Classes implement this interface to mark it as being prunable by the 
@@ -23,7 +25,7 @@ package com.saliman.entitypruner;
  * inside server code (as far as nulls and ordinary Collections are concerned).
  * 
  * @author Steven C. Saliman
- * @see EntityPruner
+ * @see EntityPruner for more details about pruning entities.
  */
 public interface PrunableEntity {
     /**
@@ -44,5 +46,38 @@ public interface PrunableEntity {
      * a pass-through to the method that gets the actual ID.
      * @return the ID of the entity.
      */
-    public Object getId();
+    public BigInteger getId();
+    
+    /**
+     * Sets the ID.  The Entity Pruner doesn't actually set the ID, but pruned
+     * entities are often serialized to a client (which is why we pruned the
+     * entity in the first place).  Some serializers, like BlazeDS, use
+     * code in the java.beans package, which doesn't see the set method in a
+     * class if it isn't also in the interfaces it implements.  Since Entities
+     * may have different classes have different types of IDs, we use generics
+     * here, since using Object here and a concrete class in the implementing
+     * entity was not enough to get the java.beans.Introspector to see the ID
+     * field. 
+     * @param id
+     */
+    public void setId(BigInteger id);
+    
+    /**
+     * When a field has (or had) a proxy for an entity, get that entitiy's ID.
+     * @param field the name of the field who's proxy entity's ID we want.
+     * @return the ID of the proxy entity, or null if the field didn't have 
+     * a proxy.
+     */
+    public Serializable getProxyEntityId(String field);
+    
+    /**
+     * Add a proxy entity ID to the entity.  When the {@link EntityPruner} 
+     * prunes an uninitialized proxy entity from a field, it uses this method
+     * to store the ID from that proxy so the unprune method can restore it
+     * later.
+     * @param field the name of the field with the proxy.
+     * @param proxyEntityId the ID of the proxied entity.
+     */
+    public void addProxyEntityId(String field, Serializable proxyEntityId);
+    
 }

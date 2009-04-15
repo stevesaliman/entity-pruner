@@ -72,6 +72,7 @@ public class EntityPrunerTest
     private static final String PARENT_DAO_NAME = "testParentDaoJpa";
     private static final String CHILD_DAO_NAME = "testChildDaoJpa";
     private static final String UNI_CHILD_DAO_NAME = "testUniChildDaoJpa";
+    private static final String PRUNER_NAME = "entityPruner";
     private static final String PARENT_TABLE = "TEST_PARENT";
     private static final String CHILD_TABLE = "TEST_CHILD";
     private static final String UNI_CHILD_TABLE = "TEST_UNI_CHILD";
@@ -96,6 +97,7 @@ public class EntityPrunerTest
     private TestParentDao parentDao;
     private TestChildDao childDao;
     private TestUniChildDao uniChildDao;
+    private EntityPruner pruner;
     private TestParentEntity parent;
     private Set<TestChildEntity> children;
     private Set<TestUniChildEntity> uniChildren;
@@ -224,6 +226,8 @@ public class EntityPrunerTest
         assertNotNull("Unable to get TestChildDao", childDao);
         uniChildDao = (TestUniChildDao)applicationContext.getBean(UNI_CHILD_DAO_NAME);
         assertNotNull("Unable to get TestUniChildDao", uniChildDao);
+        pruner = (EntityPruner)applicationContext.getBean(PRUNER_NAME);
+        assertNotNull("Unable to get EntityPruner", pruner);
         parent = new TestParentEntity();
         children = new HashSet<TestChildEntity>(2);
         uniChildren = new HashSet<TestUniChildEntity>(2);
@@ -267,6 +271,7 @@ public class EntityPrunerTest
         children = null;
         parent = null;
         parentDao = null;
+        pruner = null;
     }
 
     /** 
@@ -284,7 +289,7 @@ public class EntityPrunerTest
         parent.setChildren(null);
         parent.setUniChildren(null);
         parent.setPruned(true);
-        EntityPruner.unprune(parent);
+        pruner.unprune(parent);
         assertNull("unpruning should not have created a child set",
                       parent.getChildren());
         assertNull("unpruning should not have created a uniChild set",
@@ -312,7 +317,7 @@ public class EntityPrunerTest
         int uniChildRows = countRowsInTable(UNI_CHILD_TABLE);
         parent.setUniChildren(null);
         parent.setPruned(true);
-        EntityPruner.unprune(parent);
+        pruner.unprune(parent);
         assertNotNull("unpruning should have kept the a child set",
                       parent.getChildren());
         assertNull("unpruning should not have created a uniChild set",
@@ -342,7 +347,7 @@ public class EntityPrunerTest
     public void insertUnprunedParentAndUniChildren() {
         parent.setChildren(null);
         parent.setPruned(true);
-        EntityPruner.unprune(parent);
+        pruner.unprune(parent);
         assertNull("unpruning should not have created  a child set",
                       parent.getChildren());
         assertNotNull("unpruning should have kept a uniChild set",
@@ -371,7 +376,7 @@ public class EntityPrunerTest
         parent.setChildren(null);
         parent.setUniChildren(null);
         parent.setPruned(true);
-        EntityPruner.unprune(parent);
+        pruner.unprune(parent);
         assertNull("unpruning should not have created the a child set",
                       parent.getChildren());
         assertNull("unpruning should not have created a uniChild set",
@@ -408,7 +413,7 @@ public class EntityPrunerTest
         int uniChildRows = countRowsInTable(UNI_CHILD_TABLE);
         int numTransChild = parent.getTransChildren().size();
         purgeDaos();
-        EntityPruner.prune(parent);
+        pruner.prune(parent);
         assertNull("Prune should have nulled out the unitialized child set",
                    parent.getChildren());
         assertNull("Prune should have nulled out the unitialized uniChild set",
@@ -416,7 +421,7 @@ public class EntityPrunerTest
         assertNotNull("Prune should not have nulled out the transChildren",
                       parent.getTransChildren());
         parent.setDescription("Updated by updateParentWithoutFetchingChildren");
-        EntityPruner.unprune(parent);
+        pruner.unprune(parent);
         // This time, our null sets should be replaced with PersistentLists.
         Set<TestChildEntity> childList = parent.getChildren();
         assertNotNull("Unprune should have created a PersistentSet for children",
@@ -461,7 +466,7 @@ public class EntityPrunerTest
         int uniChildRows = countRowsInTable(UNI_CHILD_TABLE);
         int numTransChild = parent.getTransChildren().size();
         purgeDaos();
-        EntityPruner.prune(parent);
+        pruner.prune(parent);
         Set<TestChildEntity> childList = parent.getChildren();
         assertNotNull("Prune should not null fetched the children set",
                       childList);
@@ -480,7 +485,7 @@ public class EntityPrunerTest
         for ( TestUniChildEntity u : parent.getUniChildren() ) {
             u.setDescription(newDesc);
         }
-        EntityPruner.unprune(parent);
+        pruner.unprune(parent);
         // This time, our null sets should be replaced with PersistentSets.
         childList = parent.getChildren();
         assertNotNull("Unprune should have created a List for children",
@@ -511,7 +516,7 @@ public class EntityPrunerTest
         assertTrue("Shouldn't have Children", parent.getChildren().size() == 0);
         assertTrue("Shouldn't have uniChildren", parent.getUniChildren().size() ==0);
         purgeDaos();
-        EntityPruner.prune(parent);
+        pruner.prune(parent);
         assertNotNull("Should still have child set", parent.getChildren());
         assertEquals("Should have empty child set",
                      0, parent.getChildren().size());
@@ -532,14 +537,14 @@ public class EntityPrunerTest
         int uniChildRows = countRowsInTable(UNI_CHILD_TABLE);
         parent = parentDao.findById(TEST_ID);
         purgeDaos();
-        EntityPruner.prune(parent); // simulate giving to client
+        pruner.prune(parent); // simulate giving to client
         TestChildEntity child = new TestChildEntity();
         child.setParent(parent);
         child.setCode("TESTINS");
         child.setDescription("Inserted by insertUnprunedChild");
         child.setCreateUser(USER);
         child.setUpdateUser(USER);
-        EntityPruner.unprune(child);
+        pruner.unprune(child);
         child = childDao.save(child);
         assertNotNull("Child should now have an ID", child.getId());
         assertEquals("Shouldn't have changed parent table", 
@@ -564,7 +569,7 @@ public class EntityPrunerTest
         child.setDescription("Inserted by insertUnprunedChildNewParent");
         child.setCreateUser(USER);
         child.setUpdateUser(USER);
-        EntityPruner.unprune(child);
+        pruner.unprune(child);
         try {
             childDao.save(child);
             fail("Should have thrown an IllegalStateException");
@@ -585,7 +590,7 @@ public class EntityPrunerTest
         parent = parentDao.findById(TEST_ID);
         assertTrue("Need a parent that has children", parent.getChildren().size()>0);
         purgeDaos();
-        EntityPruner.prune(parent);
+        pruner.prune(parent);
         TestChildEntity child = new TestChildEntity();
         child.setParent(parent);
         child.setCode("TESTINS");
@@ -593,7 +598,7 @@ public class EntityPrunerTest
         child.setCreateUser(USER);
         child.setUpdateUser(USER);
         parent.getChildren().add(child);
-        EntityPruner.unprune(parent);
+        pruner.unprune(parent);
         parent = parentDao.save(parent);
         assertEquals("Shouldn't have changed parent table", 
                 parentRows, countRowsInTable(PARENT_TABLE));
@@ -617,14 +622,14 @@ public class EntityPrunerTest
         parent = parentDao.findById(TEST_ID);
         assertTrue("Need a parent that has children", parent.getChildren().size()>0);
         purgeDaos();
-        EntityPruner.prune(parent);
+        pruner.prune(parent);
         TestChildEntity child = new TestChildEntity();
         child.setCode("TESTINS");
         child.setDescription("Inserted by addChildNotPointingToParent");
         child.setCreateUser(USER);
         child.setUpdateUser(USER);
         parent.getChildren().add(child);
-        EntityPruner.unprune(parent);
+        pruner.unprune(parent);
         parent = parentDao.save(parent);
         assertEquals("Shouldn't have changed parent table", 
                 parentRows, countRowsInTable(PARENT_TABLE));
@@ -646,7 +651,7 @@ public class EntityPrunerTest
         parent = parentDao.findById(TEST_ID);
         assertTrue("Need a parent that has uniChildren", parent.getUniChildren().size()>0);
         purgeDaos();
-        EntityPruner.prune(parent);
+        pruner.prune(parent);
         TestUniChildEntity child = new TestUniChildEntity();
         child.setParentId(parent.getId());
         child.setCode("TESTINS");
@@ -654,7 +659,7 @@ public class EntityPrunerTest
         child.setCreateUser(USER);
         child.setUpdateUser(USER);
         parent.getUniChildren().add(child);
-        EntityPruner.unprune(parent);
+        pruner.unprune(parent);
         parent = parentDao.save(parent);
         assertEquals("Shouldn't have changed parent table", 
                 parentRows, countRowsInTable(PARENT_TABLE));
@@ -679,14 +684,14 @@ public class EntityPrunerTest
         parent = parentDao.findById(TEST_ID);
         assertTrue("Need a parent that has uniChildren", parent.getUniChildren().size()>0);
         purgeDaos();
-        EntityPruner.prune(parent);
+        pruner.prune(parent);
         TestUniChildEntity child = new TestUniChildEntity();
         child.setCode("TESTINS");
         child.setDescription("Inserted by addChildNotPointingToParent");
         child.setCreateUser(USER);
         child.setUpdateUser(USER);
         parent.getUniChildren().add(child);
-        EntityPruner.unprune(parent);
+        pruner.unprune(parent);
         try {
             parentDao.save(parent);
             fail("Should have thrown EntityExistsException");
@@ -709,7 +714,7 @@ public class EntityPrunerTest
         int uniChildRows = countRowsInTable(UNI_CHILD_TABLE);
         parent = parentDao.findById(TEST_ID);
         purgeDaos();
-        EntityPruner.prune(parent);
+        pruner.prune(parent);
         assertNull("We should have a null child set in the pruned parent",
                    parent.getChildren());
         TestChildEntity child = new TestChildEntity();
@@ -721,7 +726,7 @@ public class EntityPrunerTest
         children = new HashSet<TestChildEntity>();
         children.add(child);
         parent.setChildren(children);
-        EntityPruner.unprune(parent);
+        pruner.unprune(parent);
         parent = parentDao.save(parent);
         assertEquals("Shouldn't have changed parent table", 
                 parentRows, countRowsInTable(PARENT_TABLE));
@@ -744,8 +749,8 @@ public class EntityPrunerTest
         int uniChildRows = countRowsInTable(UNI_CHILD_TABLE);
         parent = parentDao.findById(TEST_UNICHILDLESS_ID);
         purgeDaos();
-        EntityPruner.prune(parent);
-        EntityPruner.unprune(parent);
+        pruner.prune(parent);
+        pruner.unprune(parent);
         parentDao.delete(parent);
         assertEquals("Failed to delete parent", 
                 parentRows-1, countRowsInTable(PARENT_TABLE));
@@ -767,8 +772,8 @@ public class EntityPrunerTest
     public void deleteParentWithUnfetchedUniChildren() {
         parent = parentDao.findById(TEST_ID);
         purgeDaos();
-        EntityPruner.prune(parent);
-        EntityPruner.unprune(parent);
+        pruner.prune(parent);
+        pruner.unprune(parent);
         try {
             parentDao.delete(parent);
             fail("should have thrown PersistenceException");
@@ -796,8 +801,8 @@ public class EntityPrunerTest
         //((TestParentDaoJpa)parentDao).getHibernateTemplate().evict(parent);
        // ((TestParentDaoJpa)parentDao).getEntityManager().clear();
         purgeDaos();
-        EntityPruner.prune(parent);
-        EntityPruner.unprune(parent);
+        pruner.prune(parent);
+        pruner.unprune(parent);
         parentDao.delete(parent);
         assertEquals("Failed to delete parent", 
                 parentRows-1, countRowsInTable(PARENT_TABLE));
@@ -820,8 +825,8 @@ public class EntityPrunerTest
         parent = parentDao.findById(TEST_ID);
         assertTrue("This test needs uniChild records", parent.getUniChildren().size()>0);
         purgeDaos();
-        EntityPruner.prune(parent);
-        EntityPruner.unprune(parent);
+        pruner.prune(parent);
+        pruner.unprune(parent);
         try {
             parentDao.delete(parent);
             fail("Should have thrown PersistenceException");
@@ -848,7 +853,7 @@ public class EntityPrunerTest
         assertTrue("Need at least 2 children", childList.size() > 1 );
         purgeDaos();
         for ( TestChildEntity child : childList ) {
-            EntityPruner.prune(child);
+            pruner.prune(child);
             parent = child.getParent();
             // we the parent's children are lazy loaded, so we should not get
             // and children

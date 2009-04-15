@@ -89,4 +89,9 @@
         class="com.saliman.entitypruner.testhelper.TestUniChildDaoJpa"
         scope="singleton">
     </bean>
+    <!-- The EntityPuner -->
+    <bean id="entityPruner"
+          class="com.saliman.entitypruner.EntityPrunerHibernateJpa"
+          scope="singleton">
+    </bean>
 </beans>

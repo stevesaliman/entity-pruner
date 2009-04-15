@@ -2,6 +2,8 @@ package com.saliman.entitypruner.testhelper;
 
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.persistence.Column;
 import javax.persistence.GeneratedValue;
@@ -100,6 +102,9 @@ public abstract class BaseEntity implements Serializable, PrunableEntity {
     @Transient
     private boolean pruned = false; // transient, so primitive is OK.
 
+    @Transient
+    private Map<String, Serializable> proxyIdMap;
+
     /**
      * The default constructor
      */
@@ -163,6 +168,35 @@ public abstract class BaseEntity implements Serializable, PrunableEntity {
     @Override
     public void setPruned(boolean pruned) {
         this.pruned = pruned;
+    }
+
+    /**
+     * When a field has (or had) a proxy for an entity, get that entitiy's ID.
+     * @param field the name of the field who's proxy entity's ID we want.
+     * @return the ID of the proxy entity, or null if the field didn't have 
+     * a proxy.
+     */
+    public Serializable getProxyEntityId(String field) {
+        Serializable proxyId = null;
+        if ( proxyIdMap != null ) {
+            proxyId =  proxyIdMap.get(field);
+        }
+        return proxyId;
+    }
+
+    /**
+     * Add a proxy entity ID to the entity.  When the {@link EntityPruner} 
+     * prunes an uninitialized proxy entity from a field, it uses this method
+     * to store the ID from that proxy so the unprune method can restore it
+     * later.
+     * @param field the name of the field with the proxy.
+     * @param proxyEntityId the ID of the proxied entity.
+     */
+    public void addProxyEntityId(String field, Serializable proxyEntityId) {
+        if ( proxyIdMap == null ) {
+            proxyIdMap = new HashMap<String, Serializable>();
+        }
+        proxyIdMap.put(field, proxyEntityId);
     }
 
     /**
