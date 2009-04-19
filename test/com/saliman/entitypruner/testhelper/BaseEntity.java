@@ -2,7 +2,6 @@ package com.saliman.entitypruner.testhelper;
 
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.HashMap;
 import java.util.Map;
 
 import javax.persistence.Column;
@@ -37,7 +36,7 @@ import com.saliman.entitypruner.PrunableEntity;
  * for optimistic locking.  This class also defines the sequence generator
  * that will be used to generate IDs when records are inserted to the 
  * database.  If an Entity needs to keep track of the create and update user,
- * they should extend {@link AuditableEntity} to get the 4 autit columns as
+ * they should extend {@link AuditableEntity} to get the 4 audit columns as
  * well.
  * <p>
  * To use an Entity in applications, 3 things are required.<br>
@@ -52,11 +51,13 @@ import com.saliman.entitypruner.PrunableEntity;
  * in the database.
  * <p>
  * If an Entity needs to be sent to a remote client, either through a Web
- * Service, or RMI, the Entity will need to be dehydrated first to avoid
- * Lazy Loading and circular reference issues. Objects coming in from a remote
- * client will need to be re-hydrated before use. The {@link EntityUtil} class
- * provides methods to do this work.  At the moment, {@link EntityUtil} 
- * assumes that collections of children are a Set, not a List.
+ * Service, or RMI, the Entity will need to be pruned first to avoid Lazy 
+ * Loading and circular reference issues. Objects coming in from a remote
+ * client will need to be un-pruned before use. This abstract class implements
+ * the {@link PrunableEntity} interface and adds the methods needed so that 
+ * the {@link EntityPruner} can be used to perform this work. At the moment, 
+ * the {@link EntityPruner}  assumes that collections of children are a Set, 
+ * not a List.
  * <p>
  * Care should be taken when considering attributes of a primitive type. It's
  * fine if the attribute is transient, but if it is mapped to a database
@@ -71,6 +72,15 @@ import com.saliman.entitypruner.PrunableEntity;
  * wildcard for a primitive. Use of the Java wrapper classes is recommended
  * instead.
  * <p>
+ * One also need to be aware of a current limitation of the 
+ * {@link java.beans.Introspector} class.  It expects a reader method to 
+ * start with &quot;get&quot; for all types except the primitive 
+ * <code>boolean</code> type, whose readers start with &quot;is&quot;.  This
+ * is important because code that tries to serialize a bean to send to a 
+ * client, like BlazeDS, uses the Introspector to get the properties of a bean.
+ * There is some debate on whether this is a bug or a feature, but until that
+ * gets sorted out, Boolean fields should have, both a &quot;get&quot; and an
+ * &quot;is&quot; method.
  * 
  * @author Steven C. Saliman
  * @see AuditableEntity
@@ -99,11 +109,12 @@ public abstract class BaseEntity implements Serializable, PrunableEntity {
     @Column(name="version")
     private Long version;
     
+    // These next 2 are for the EntityPruner
     @Transient
     private boolean pruned = false; // transient, so primitive is OK.
 
     @Transient
-    private Map<String, Serializable> proxyIdMap;
+    private Map<String, Object> fieldIdMap;
 
     /**
      * The default constructor
@@ -117,7 +128,6 @@ public abstract class BaseEntity implements Serializable, PrunableEntity {
      * is saved to the database
      * @return Long the database id of the record
      */
-    @Override
     public BigInteger getId() {
         return id;
     }
@@ -171,32 +181,29 @@ public abstract class BaseEntity implements Serializable, PrunableEntity {
     }
 
     /**
-     * When a field has (or had) a proxy for an entity, get that entitiy's ID.
-     * @param field the name of the field who's proxy entity's ID we want.
-     * @return the ID of the proxy entity, or null if the field didn't have 
-     * a proxy.
+     * @return the fieldIdMap for the EntityPruner to use.
      */
-    public Serializable getProxyEntityId(String field) {
-        Serializable proxyId = null;
-        if ( proxyIdMap != null ) {
-            proxyId =  proxyIdMap.get(field);
-        }
-        return proxyId;
+    @Override
+    public Map<String, Object> getFieldIdMap() {
+        return fieldIdMap;
     }
 
     /**
-     * Add a proxy entity ID to the entity.  When the {@link EntityPruner} 
-     * prunes an uninitialized proxy entity from a field, it uses this method
-     * to store the ID from that proxy so the unprune method can restore it
-     * later.
-     * @param field the name of the field with the proxy.
-     * @param proxyEntityId the ID of the proxied entity.
+     * @param fieldIdMap the fieldIdMap to set from the EntityPruner
      */
-    public void addProxyEntityId(String field, Serializable proxyEntityId) {
-        if ( proxyIdMap == null ) {
-            proxyIdMap = new HashMap<String, Serializable>();
-        }
-        proxyIdMap.put(field, proxyEntityId);
+    @Override
+    public void setFieldIdMap(Map<String, Object> fieldIdMap) {
+        this.fieldIdMap = fieldIdMap;
+    }
+
+    /**
+     * Determine if the Entity has been persisted.  For this class, and its
+     * subclasses, this means it has an ID.
+     * @return whether or not the Entity has been persisted.
+     */
+    @Override
+    public boolean isPersistent() {
+        return id != null;    
     }
 
     /**

@@ -7,8 +7,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 import javax.ejb.Stateless;
 import javax.ejb.TransactionAttribute;
@@ -42,6 +44,9 @@ import org.hibernate.proxy.LazyInitializer;
  * and at the moment, child collections must be a <code>Set</code>.  In
  * Addition, the entities must use field annotations and not method 
  * annotations.
+ * <p>
+ * Since the EntityPruner logs its activity, we recommend Entities implement
+ * a <code>toString()</code> method.
  * 
  * @see PrunableEntity
  * 
@@ -169,7 +174,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
         // parent objects in their toString() methods, which could be 
         // uninitialized proxies.
         String msg = "Error pruning " + entity.getClass() + " " + 
-                     entity.getId() + ": ";
+                     entity + ": ";
         try {
             List<Field> fields = loadFields(entity.getClass());
             for ( Field field : fields ) {
@@ -257,7 +262,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
         // parent objects in their toString() methods, which could be 
         // uninitialized proxies.
         String msg = "Error pruning " + entity.getClass() + " " + 
-                     entity.getId() + ": ";
+                     entity + ": ";
         try {
             List<Field> fields = loadFields(entity.getClass());
             for ( Field field : fields ) {
@@ -445,7 +450,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
             //    IDs don't change during the un-pruning process.
             // 2. The collection is persistent (not Transient).
             Annotation a = field.getAnnotation(Transient.class);
-            if ( (a == null) && (entity.getId() != null) ) {
+            if ( (a == null) && (entity.isPersistent() ) ) {
                 setValue(field, entity, new PersistentSet());
             }
         } else {
@@ -635,7 +640,12 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
             // to prune it out to avoid lazy load problems, but we need to 
             // record the fact that it did have a value for unpruning later.
             Serializable proxyEntityId = initializer.getIdentifier();
-            entity.addProxyEntityId(fieldName, proxyEntityId);
+            Map<String, Object> fieldIdMap = entity.getFieldIdMap();
+            if ( fieldIdMap == null ) {
+                fieldIdMap = new HashMap<String, Object>();
+                entity.setFieldIdMap(fieldIdMap);
+            }
+            fieldIdMap.put(fieldName, proxyEntityId);
             return null;
         }
         return entityClass.cast(value);
@@ -651,6 +661,8 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
      * objects.
      * @throws IllegalArgumentException
      * @throws IllegalAccessException
+     * @throws ClassCastException if the fieldIdMap contains a non-serializable
+     * ID.
      */
     private void reproxy(PrunableEntity entity, PrunableEntity value,
             Field field, SessionImpl session) throws IllegalArgumentException, IllegalAccessException {
@@ -666,7 +678,11 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
         if ( value != null ) {
             unprune((PrunableEntity)value);
         } else {
-            Serializable proxyEntityId = entity.getProxyEntityId(field.getName());
+            Serializable proxyEntityId = null;
+            Map<String, Object> fieldIdMap = entity.getFieldIdMap();
+            if ( fieldIdMap != null ) {
+                proxyEntityId = (Serializable)fieldIdMap.get(field.getName());
+            }
             if ( proxyEntityId != null ) {
                 // We know it is lazy fetched because the pruner wouldn't have 
                 // stored the id otherwise.  When I am in a less lazy mood, I'll 
