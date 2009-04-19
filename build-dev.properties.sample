@@ -1,5 +1,5 @@
 # General parameters, like the name and version.
-application.version=1.2.0
+application.version=2.1.0
 
 ########################## Testing Parameters #############################
 # JDBC credentials for unit testing.  In production, we're using the jndi 
@@ -8,7 +8,7 @@ application.version=1.2.0
 jdbc.driverClassName=oracle.jdbc.driver.OracleDriver
 jdbc.url=jdbc:oracle:thin:@vader:1521:devl
 jdbc.username=sane_owner
-jdbc.password=sodevl
+jdbc.password=<password>
 hibernate.show.sql=true
 
 ############################################################################
