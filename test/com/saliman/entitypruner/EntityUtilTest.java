@@ -23,12 +23,12 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.AbstractTransactionalJUnit4SpringContextTests;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.saliman.entitypruner.testhelper.TestChildDao;
-import com.saliman.entitypruner.testhelper.TestChildEntity;
-import com.saliman.entitypruner.testhelper.TestParentDao;
-import com.saliman.entitypruner.testhelper.TestParentEntity;
-import com.saliman.entitypruner.testhelper.TestUniChildDao;
-import com.saliman.entitypruner.testhelper.TestUniChildEntity;
+import com.saliman.entitypruner.testhelper.set.TestSetChildDao;
+import com.saliman.entitypruner.testhelper.set.TestSetChildEntity;
+import com.saliman.entitypruner.testhelper.set.TestSetParentDao;
+import com.saliman.entitypruner.testhelper.set.TestSetParentEntity;
+import com.saliman.entitypruner.testhelper.set.TestSetUniChildDao;
+import com.saliman.entitypruner.testhelper.set.TestSetUniChildEntity;
 
 /**
  * This class tests the methods of the EntityUtil class.
@@ -40,9 +40,9 @@ import com.saliman.entitypruner.testhelper.TestUniChildEntity;
 public class EntityUtilTest
        extends AbstractTransactionalJUnit4SpringContextTests  {
     /** the class variable used for logging */
-    private static final String PARENT_DAO_NAME = "testParentDaoJpa";
-    private static final String CHILD_DAO_NAME = "testChildDaoJpa";
-    private static final String UNI_CHILD_DAO_NAME = "testUniChildDaoJpa";
+    private static final String PARENT_DAO_NAME = "testSetParentDaoJpa";
+    private static final String CHILD_DAO_NAME = "testSetChildDaoJpa";
+    private static final String UNI_CHILD_DAO_NAME = "testSetUniChildDaoJpa";
     private static final BigInteger TEST_ID = new BigInteger("-1");
     private static final String USER = "JUNIT";
     private static final String PARENT_SQL = 
@@ -59,12 +59,12 @@ public class EntityUtilTest
         "values(?, ?, ?, ?, ?, ?)";
     
     
-    private TestParentDao parentDao;
-    private TestChildDao childDao;
-    private TestUniChildDao uniChildDao;
-    private TestParentEntity parent;
-    private Set<TestChildEntity> children;
-    private Set<TestUniChildEntity> uniChildren;
+    private TestSetParentDao parentDao;
+    private TestSetChildDao childDao;
+    private TestSetUniChildDao uniChildDao;
+    private TestSetParentEntity parent;
+    private Set<TestSetChildEntity> children;
+    private Set<TestSetUniChildEntity> uniChildren;
 
     /**
      * Default Constructor, initializes logging.
@@ -167,21 +167,21 @@ public class EntityUtilTest
     public void setUp() throws Exception {
         deleteData(); // in case some other test did a commit.
         createData();
-        parentDao = (TestParentDao)applicationContext.getBean(PARENT_DAO_NAME);
+        parentDao = (TestSetParentDao)applicationContext.getBean(PARENT_DAO_NAME);
         assertNotNull("Unable to get TestParentDao", parentDao);
-        childDao = (TestChildDao)applicationContext.getBean(CHILD_DAO_NAME);
+        childDao = (TestSetChildDao)applicationContext.getBean(CHILD_DAO_NAME);
         assertNotNull("Unable to get TestChildDao", childDao);
-        uniChildDao = (TestUniChildDao)applicationContext.getBean(UNI_CHILD_DAO_NAME);
+        uniChildDao = (TestSetUniChildDao)applicationContext.getBean(UNI_CHILD_DAO_NAME);
         assertNotNull("Unable to get TestUniChildDao", uniChildDao);
-        parent = new TestParentEntity();
-        children = new HashSet<TestChildEntity>(2);
-        uniChildren = new HashSet<TestUniChildEntity>(2);
+        parent = new TestSetParentEntity();
+        children = new HashSet<TestSetChildEntity>(2);
+        uniChildren = new HashSet<TestSetUniChildEntity>(2);
         parent.setCode("JPARENT1");
         parent.setDescription("Parent 1");
         parent.setAffirmative(Boolean.TRUE); // can't be null;
         parent.setCreateUser(USER);
         parent.setUpdateUser(USER);
-        TestChildEntity child = new TestChildEntity();
+        TestSetChildEntity child = new TestSetChildEntity();
         child.setParent(parent);
         child.setCode("JCHILD1");
         child.setDescription("Child 1");
@@ -189,7 +189,7 @@ public class EntityUtilTest
         child.setUpdateUser(USER);
         children.add(child);
         parent.setChildren(children);
-        TestUniChildEntity uniChild = new TestUniChildEntity();
+        TestSetUniChildEntity uniChild = new TestSetUniChildEntity();
         uniChild.setCode("JCHILD1");
         uniChild.setDescription("Child 1");
         uniChild.setCreateUser(USER);
@@ -249,7 +249,7 @@ public class EntityUtilTest
      */
     @Test
     public void initializedArrayList() {
-        parent.setChildren(new HashSet<TestChildEntity>());
+        parent.setChildren(new HashSet<TestSetChildEntity>());
         assertTrue("new ArrayLists should be initialized",
                 EntityUtil.initialized(parent.getChildren()));
         
@@ -272,7 +272,7 @@ public class EntityUtilTest
     public void copyTransientData() {
         // put the children in the transient collection.
         parent.setTransChildren(parent.getChildren());
-        TestParentEntity copy = new TestParentEntity();
+        TestSetParentEntity copy = new TestSetParentEntity();
         EntityUtil.copyTransientData(parent, copy);
         assertEquals("Failed to copy transient children",
                 parent.getTransChildren(), copy.getTransChildren());
@@ -287,7 +287,7 @@ public class EntityUtilTest
     public void copyTransientDataNull() {
         // put the children in the transient collection.
         parent.setTransChildren(parent.getChildren());
-        TestParentEntity copy = new TestParentEntity();
+        TestSetParentEntity copy = new TestSetParentEntity();
         // Our Unit Test utility won't handle static methods so ...
         try {
             EntityUtil.copyTransientData(parent, null);

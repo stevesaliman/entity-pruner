@@ -11,7 +11,7 @@ import java.util.List;
 import javax.persistence.Transient;
 
 import org.apache.log4j.Logger;
-import org.hibernate.collection.PersistentSet;
+import org.hibernate.collection.PersistentCollection;
 import org.hibernate.proxy.HibernateProxy;
 import org.hibernate.proxy.LazyInitializer;
 
@@ -49,14 +49,13 @@ public class EntityUtil {
     public static boolean initialized(Collection<?> collection) {
         boolean init = false;
 
-        //TODO: expand this to support PersistentSets and PersistentLists
         if ( collection == null ) {
             // null is treated as uninitialized
             init = false;
-        } else if (!PersistentSet.class.isAssignableFrom(collection.getClass())) {
+        } else if (!PersistentCollection.class.isAssignableFrom(collection.getClass())) {
             // if it's not a Hibernate PersistentBag, it's initialized.
             init = true;
-        } else if ( !((PersistentSet)collection).wasInitialized() ) {
+        } else if ( !((PersistentCollection)collection).wasInitialized() ) {
             // If Hibernate hasn't loaded the collection, it't not initialized
             init = false;
         } else {

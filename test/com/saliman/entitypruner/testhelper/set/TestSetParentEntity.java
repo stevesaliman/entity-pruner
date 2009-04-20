@@ -1,4 +1,4 @@
-package com.saliman.entitypruner.testhelper;
+package com.saliman.entitypruner.testhelper.set;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -23,6 +23,8 @@ import org.hibernate.annotations.Type;
 
 import com.saliman.entitypruner.EntityPruner;
 import com.saliman.entitypruner.PrunableEntity;
+import com.saliman.entitypruner.testhelper.AuditableEntity;
+import com.saliman.entitypruner.testhelper.BaseDaoJpa;
 
 
 /** 
@@ -37,11 +39,14 @@ import com.saliman.entitypruner.PrunableEntity;
  * It is also used to test the {@link BaseDaoJpa} functionality.
  * <p>
  * The main point here is that if a test fails it is important to know if it
- * is a problem with the DAO or with the BaseEntity.
+ * is a problem with the DAO or with the Entity.
  * <p>
  * For the tests to work, this object needs 3 types of collections.  A 
  * Collection of objects with a Parent object, a Collection of objects with 
  * only the ID of the parent, and a Transient collection of objects.
+ * <p>
+ * This version of the test parent uses <code>Set</code>s to store child
+ * collections.
  * 
  * @author Steven C. Saliman
  */
@@ -52,7 +57,7 @@ import com.saliman.entitypruner.PrunableEntity;
 		                          dynamicUpdate=true,
 		                          optimisticLock=OptimisticLockType.VERSION)
 @Cache(usage=CacheConcurrencyStrategy.NONE)
-public class TestParentEntity extends AuditableEntity implements Serializable {
+public class TestSetParentEntity extends AuditableEntity implements Serializable {
     /** Serial version ID */
     private static final long serialVersionUID = 1L;
 
@@ -86,17 +91,17 @@ public class TestParentEntity extends AuditableEntity implements Serializable {
     
     @OneToMany(mappedBy="parent", fetch=FetchType.LAZY,
             cascade= {CascadeType.ALL })
-    private Set<TestChildEntity> children;
+    private Set<TestSetChildEntity> children;
     
     @OneToMany(fetch=FetchType.LAZY, cascade={CascadeType.ALL})
     @JoinColumn(name="test_parent_id")
-    private Set<TestUniChildEntity> uniChildren;
+    private Set<TestSetUniChildEntity> uniChildren;
 
     @Transient
-    private Set<TestChildEntity> transChildren;
+    private Set<TestSetChildEntity> transChildren;
 
 	/** default constructor */
-    public TestParentEntity() {
+    public TestSetParentEntity() {
         super(); 
     }
 
@@ -229,42 +234,42 @@ public class TestParentEntity extends AuditableEntity implements Serializable {
     /**
      * @return the children
      */
-    public Set<TestChildEntity> getChildren() {
+    public Set<TestSetChildEntity> getChildren() {
         return children;
     }
 
     /**
      * @param children the children to set
      */
-    public void setChildren(Set<TestChildEntity> children) {
+    public void setChildren(Set<TestSetChildEntity> children) {
         this.children = children;
     }
 
     /**
      * @return the uniChildren
      */
-    public Set<TestUniChildEntity> getUniChildren() {
+    public Set<TestSetUniChildEntity> getUniChildren() {
         return uniChildren;
     }
 
     /**
      * @param uniChildren the uniChildren to set
      */
-    public void setUniChildren(Set<TestUniChildEntity> uniChildren) {
+    public void setUniChildren(Set<TestSetUniChildEntity> uniChildren) {
         this.uniChildren = uniChildren;
     }
 
     /**
      * @return the transChildren
      */
-    public Set<TestChildEntity> getTransChildren() {
+    public Set<TestSetChildEntity> getTransChildren() {
         return transChildren;
     }
 
     /**
      * @param transChildren the transChildren to set
      */
-    public void setTransChildren(Set<TestChildEntity> transChildren) {
+    public void setTransChildren(Set<TestSetChildEntity> transChildren) {
         this.transChildren = transChildren;
     }
 
@@ -283,11 +288,11 @@ public class TestParentEntity extends AuditableEntity implements Serializable {
             return true;
         }
 
-        if ( !(other instanceof TestParentEntity) ) {
+        if ( !(other instanceof TestSetParentEntity) ) {
             return false;
         }
 
-        TestParentEntity castOther = (TestParentEntity) other;
+        TestSetParentEntity castOther = (TestSetParentEntity) other;
         return new EqualsBuilder().append(this.getCode(), castOther.getCode())
                                   .isEquals();
     }

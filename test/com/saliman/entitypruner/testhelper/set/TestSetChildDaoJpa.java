@@ -1,9 +1,12 @@
-package com.saliman.entitypruner.testhelper;
+package com.saliman.entitypruner.testhelper.set;
 
 import java.math.BigInteger;
 import java.util.List;
 
+import javax.ejb.Stateless;
 import javax.persistence.Query;
+
+import com.saliman.entitypruner.testhelper.BaseDaoJpa;
 
 /**
  * This class only exists to test the Framework. It
@@ -11,20 +14,21 @@ import javax.persistence.Query;
  *
  * @author Steven C. Saliman
  */
-public class TestChildDaoJpa extends BaseDaoJpa<TestChildEntity>
-                                   implements TestChildDao {
+@Stateless(name="TestSetChildDao")
+public class TestSetChildDaoJpa extends BaseDaoJpa<TestSetChildEntity>
+                                   implements TestSetChildDao {
     private static final String FIND_BY_PARENT_QUERY = 
-        "select c from TestChildEntity c " +
+        "select c from TestSetChildEntity c " +
         "where c.parent.id = :parentId";
     
     /**
 	 * Default Constructor
 	 */
-	public TestChildDaoJpa() {
+	public TestSetChildDaoJpa() {
 		super();
 	}
 
-    public List<TestChildEntity> findByParentId(BigInteger parentId) {
+    public List<TestSetChildEntity> findByParentId(BigInteger parentId) {
         Query query = entityManager.createQuery(FIND_BY_PARENT_QUERY);
         query.setParameter("parentId", parentId);
         return query.getResultList();

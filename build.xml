@@ -61,10 +61,11 @@
     -->
     <filter token="application.version" value="${application.version}"/>
     <filter token="default.log.level" value="${default.log.level}"/>
-    <filter token="jdbc.url" value="${jdbc.url}"/>
-    <filter token="jdbc.username" value="${jdbc.username}"/>
-    <filter token="jdbc.password" value="${jdbc.password}"/>
-    <filter token="jdbc.driverClassName" value="${jdbc.driverClassName}"/>
+    <filter token="jndi.data.source" value="${jndi.data.source}"/>
+    <filter token="test.jdbc.url" value="${test.jdbc.url}"/>
+    <filter token="test.jdbc.username" value="${test.jdbc.username}"/>
+    <filter token="test.jdbc.password" value="${test.jdbc.password}"/>
+    <filter token="test.jdbc.driver" value="${test.jdbc.driver}"/>
     <filter token="hibernate.show.sql" value="${hibernate.show.sql}"/>
     
     <!-- Classpath for compilation -->
@@ -95,17 +96,17 @@
         <fail unless="application.version">
             You must set "application.version" property.
         </fail>
-        <fail unless="jdbc.url">
-            You must set "jdbc.url" property.
+        <fail unless="test.jdbc.url">
+            You must set "test.jdbc.url" property.
         </fail>
-        <fail unless="jdbc.driverClassName">
-            You must set "jdbc.driverClassName" property.
+        <fail unless="test.jdbc.driver">
+            You must set "test.jdbc.driver" property.
         </fail>
-        <fail unless="jdbc.username">
-            You must set "jdbc.username" property.
+        <fail unless="test.jdbc.username">
+            You must set "test.jdbc.username" property.
         </fail>
-        <fail unless="jdbc.password">
-            You must set "jdbc.password" property.
+        <fail unless="test.jdbc.password">
+            You must set "test.jdbc.password" property.
         </fail>
         <fail unless="test.log.dir">
             You must set "test.log.dir" property.
@@ -125,6 +126,7 @@
         <delete dir="${build.dir}" includeEmptyDirs="true"/>
         <delete dir="${dist.dir}" includeEmptyDirs="true"/>
         <delete dir="${doc.dir}/api" includeEmptyDirs="true"/>
+        <delete file="${test.dir}/openejb.xml"/>
         <delete file="${test.log.dir}/${test.log.prefix}.log"/>
         <delete file="${test.log.dir}/${test.log.prefix}-security.log"/>
         <delete file="${test.log.dir}/${test.log.prefix}-event.log"/>
@@ -145,6 +147,9 @@
         <mkdir dir="${src.build.dir}"/>
         <mkdir dir="${dist.dir}"/>
         <mkdir dir="${dist.doc.dir}"/>
+        <copy file="${templates.dir}/openejb.xml"
+              tofile="${test.dir}/openejb.xml"
+              overwrite="yes" filtering="true"/>
     </target>
 
     <!-- copy files needed for unit tests. -->

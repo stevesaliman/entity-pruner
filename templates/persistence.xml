@@ -16,9 +16,12 @@
         <provider>org.hibernate.ejb.HibernatePersistence</provider>
         <class>com.saliman.entitypruner.testhelper.BaseEntity</class>
         <class>com.saliman.entitypruner.testhelper.AuditableEntity</class>
-        <class>com.saliman.entitypruner.testhelper.TestParentEntity</class>
-        <class>com.saliman.entitypruner.testhelper.TestChildEntity</class>
-        <class>com.saliman.entitypruner.testhelper.TestUniChildEntity</class>
+        <class>com.saliman.entitypruner.testhelper.list.TestListParentEntity</class>
+        <class>com.saliman.entitypruner.testhelper.list.TestListChildEntity</class>
+        <class>com.saliman.entitypruner.testhelper.list.TestListUniChildEntity</class>
+        <class>com.saliman.entitypruner.testhelper.set.TestSetParentEntity</class>
+        <class>com.saliman.entitypruner.testhelper.set.TestSetChildEntity</class>
+        <class>com.saliman.entitypruner.testhelper.set.TestSetUniChildEntity</class>
 
         <properties>
             <property name="hibernate.cache.provider_class" 

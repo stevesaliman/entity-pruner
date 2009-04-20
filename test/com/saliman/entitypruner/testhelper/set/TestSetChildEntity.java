@@ -1,10 +1,11 @@
-package com.saliman.entitypruner.testhelper;
+package com.saliman.entitypruner.testhelper.set;
 
 import java.io.Serializable;
-import java.math.BigInteger;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
 import org.apache.commons.lang.builder.EqualsBuilder;
@@ -14,41 +15,42 @@ import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.annotations.OptimisticLockType;
 
+import com.saliman.entitypruner.testhelper.AuditableEntity;
+import com.saliman.entitypruner.testhelper.BaseDaoJpa;
+
 
 /** 
  * This class only exists to test the Framework code. It tests the
- * {@link BaseEntity} and {@link BaseDaoJpa} code. 
- * This object needs to have a only a parent object id.  It tests to make 
- * sure we can dehydrate/rehydrate objects destined for XML serialization
- * without lazy loading issues.
- *  
+ * {@link Persistable} and {@link BaseDaoJpa} code.  This object needs to
+ * have a parent object.  It tests to make sure we can dehydrate/rehydrate 
+ * without endless loops.
+ * 
  * @author Steven C. Saliman
- * @see TestParentEntity
+ * @see com.saliman.entitypruner.testhelper.set.TestSetParentEntity
  */
 @Entity
-@Table(name="test_uni_child")
+@Table(name="test_child")
 @org.hibernate.annotations.Entity(mutable=true, 
 		                          dynamicInsert=true,
 		                          dynamicUpdate=true,
 		                          optimisticLock=OptimisticLockType.VERSION)
 @Cache(usage=CacheConcurrencyStrategy.NONE)
-public class TestUniChildEntity extends AuditableEntity
+public class TestSetChildEntity extends AuditableEntity
                          implements Serializable {
     /** Serial version ID */
     private static final long serialVersionUID = 1L;
 
-    @Column(name="test_parent_id")
-    private BigInteger parentId;
+    @ManyToOne
+    @JoinColumn(name="test_parent_id")
+    private TestSetParentEntity parent;
 
     @Column(name="code")
     private String code;
-    
+
     @Column(name="description")
     private String description;
-    
-    
     /** default constructor */
-    public TestUniChildEntity() {
+    public TestSetChildEntity() {
         super(); 
     }
 
@@ -56,16 +58,16 @@ public class TestUniChildEntity extends AuditableEntity
      * Gets the parent
      * @return the parent
      */
-    public BigInteger getParentId() {
-        return parentId;
+    public TestSetParentEntity getParent() {
+        return parent;
     }
 
     /**
      * Sets the parent
-     * @param parentId the message to use.
+     * @param parent the message to use.
      */
-    public void setParentId(BigInteger parentId) {
-        this.parentId = parentId;
+    public void setParent(TestSetParentEntity parent) {
+        this.parent = parent;
     }
 
     /**
@@ -111,18 +113,18 @@ public class TestUniChildEntity extends AuditableEntity
             return true;
         }
 
-        if ( !(other instanceof TestUniChildEntity) ) {
+        if ( !(other instanceof TestSetChildEntity) ) {
             return false;
         }
 
-        TestUniChildEntity castOther = (TestUniChildEntity) other;
-        return new EqualsBuilder().append(this.getParentId(), castOther.getParentId())
+        TestSetChildEntity castOther = (TestSetChildEntity) other;
+        return new EqualsBuilder().append(this.getParent(), castOther.getParent())
                                   .append(this.getCode(), castOther.getCode())
                                   .isEquals();
     }
 
     public int hashCode() {
-        return new HashCodeBuilder().append(parentId)
+        return new HashCodeBuilder().append(parent)
                                     .append(code)
                                     .toHashCode();
     }

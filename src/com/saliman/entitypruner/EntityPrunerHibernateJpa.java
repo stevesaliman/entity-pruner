@@ -11,6 +11,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import javax.ejb.Stateless;
 import javax.ejb.TransactionAttribute;
@@ -22,7 +25,10 @@ import javax.persistence.PersistenceContext;
 import javax.persistence.Transient;
 
 import org.apache.log4j.Logger;
+import org.hibernate.collection.PersistentCollection;
+import org.hibernate.collection.PersistentList;
 import org.hibernate.collection.PersistentSet;
+import org.hibernate.collection.PersistentSortedSet;
 import org.hibernate.ejb.EntityManagerImpl;
 import org.hibernate.impl.SessionImpl;
 import org.hibernate.proxy.HibernateProxy;
@@ -40,10 +46,10 @@ import org.hibernate.proxy.LazyInitializer;
  * results.
  * <p>
  * This class is heavily dependent on the JPA provider and the types of
- * collections Entities have.  This implementation only work with Hibernate, 
- * and at the moment, child collections must be a <code>Set</code>.  In
- * Addition, the entities must use field annotations and not method 
- * annotations.
+ * collections Entities have.  This implementation only works with Hibernate, 
+ * and at the moment, child collections must be either a <code>Set</code>,
+ * <code>SortedSet</code> or <code>List</code>.  In Addition, the entities must
+ * use field annotations and not method annotations.
  * <p>
  * Since the EntityPruner logs its activity, we recommend Entities implement
  * a <code>toString()</code> method.
@@ -349,18 +355,27 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
                         InvocationTargetException, SecurityException, IllegalArgumentException, NoSuchMethodException {
         Collection newValue = null;
         
-        // TODO: Add support for lists.  We can do this by using the declared 
-        // type.  Lists will be in a PersistentBag
         // We only need to deal with the collection if we want a depth > 1.
         // Otherwise, we don't want any children.
         if ( depth > 1 ) {
-            if ( PersistentSet.class.isAssignableFrom(collection.getClass()) ) {
-                if ( !((PersistentSet)collection).wasInitialized() ) {
+            if ( PersistentCollection.class.isAssignableFrom(collection.getClass()) ) {
+                if ( !((PersistentCollection)collection).wasInitialized() ) {
                     // non-initialized, so prune with a null.
                     newValue = null;
                 } else { 
-                    // replace PersistentSet with HashSet.
-                    newValue = new HashSet();
+                    // replace the PersistentCollection with the appropriate
+                    // collection type.
+                    Class<?> fieldType = field.getType();
+                    if ( SortedSet.class.isAssignableFrom(fieldType) ) {
+                        newValue = new TreeSet();
+                    } else if ( Set.class.isAssignableFrom(fieldType) ) {
+                        newValue = new HashSet();
+                    } else if ( List.class.isAssignableFrom(fieldType) ) {
+                        newValue = new ArrayList();
+                    } else {
+                        throw new IllegalStateException(fieldType + 
+                                " collections are not supported by the EntityPruner");
+                    }
                     newValue.addAll(collection);
                 }
             } else {
@@ -451,7 +466,17 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
             // 2. The collection is persistent (not Transient).
             Annotation a = field.getAnnotation(Transient.class);
             if ( (a == null) && (entity.isPersistent() ) ) {
-                setValue(field, entity, new PersistentSet());
+                Class<?> fieldType = field.getType();
+                if ( SortedSet.class.isAssignableFrom(fieldType) ) {
+                    setValue(field, entity, new PersistentSortedSet());
+                } else if ( Set.class.isAssignableFrom(fieldType) ) {
+                    setValue(field, entity, new PersistentSet());
+                } else if ( List.class.isAssignableFrom(fieldType) ) {
+                    setValue(field, entity, new PersistentList());
+                } else {
+                    throw new IllegalStateException(fieldType + 
+                            " collections are not supported by the EntityPruner");
+                }
             }
         } else {
             // Note that in this case, we'll have a collection that isn't

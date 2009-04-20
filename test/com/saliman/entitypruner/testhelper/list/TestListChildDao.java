@@ -1,7 +1,11 @@
-package com.saliman.entitypruner.testhelper;
+package com.saliman.entitypruner.testhelper.list;
 
 import java.math.BigInteger;
 import java.util.List;
+
+import javax.ejb.Local;
+
+import com.saliman.entitypruner.testhelper.BaseDao;
 
 
 /**
@@ -9,11 +13,12 @@ import java.util.List;
  *
  * @author Steven C. Saliman
  */
-public interface TestChildDao extends BaseDao<TestChildEntity> {
+@Local
+public interface TestListChildDao extends BaseDao<TestListChildEntity> {
     /**
      * Find children with the specified parent id.
      * @param parentId
      * @return a list of children.
      */
-    public List<TestChildEntity> findByParentId(BigInteger parentId);
+    public List<TestListChildEntity> findByParentId(BigInteger parentId);
 }

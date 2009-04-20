@@ -75,18 +75,18 @@
         </property>
     </bean>
 
-    <bean id="testParentDaoJpa"
-        class="com.saliman.entitypruner.testhelper.TestParentDaoJpa"
+    <bean id="testSetParentDaoJpa"
+        class="com.saliman.entitypruner.testhelper.set.TestSetParentDaoJpa"
         scope="singleton">
     </bean>
 
-    <bean id="testChildDaoJpa"
-        class="com.saliman.entitypruner.testhelper.TestChildDaoJpa"
+    <bean id="testSetChildDaoJpa"
+        class="com.saliman.entitypruner.testhelper.set.TestSetChildDaoJpa"
         scope="singleton">
     </bean>
 
-    <bean id="testUniChildDaoJpa"
-        class="com.saliman.entitypruner.testhelper.TestUniChildDaoJpa"
+    <bean id="testSetUniChildDaoJpa"
+        class="com.saliman.entitypruner.testhelper.set.TestSetUniChildDaoJpa"
         scope="singleton">
     </bean>
     <!-- The EntityPuner -->
