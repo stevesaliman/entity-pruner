@@ -243,6 +243,16 @@
             	<pathelement path="${src.build.dir}/classes"/>
             </classpath>
         </javac>
+        <copy todir="${test.build.dir}/classes"
+              preservelastmodified="true">
+            <fileset dir="${test.dir}"
+                     includes="**/*.xml"/>
+        </copy>
+        <copy todir="${test.build.dir}/classes"
+              preservelastmodified="true">
+            <fileset dir="${test.dir}"
+                     includes="**/*.properties"/>
+        </copy>
     </target>
 
     <!-- ==================== Jar Target ================================== -->
