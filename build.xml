@@ -374,9 +374,11 @@
                     includes="**/${testcase}.class"
                />
             </batchtest>
+            <!-- We don't want to test the testhelper classes -->
             <batchtest todir="${test.results.dir}" unless="testcase">
                 <fileset dir="${test.build.dir}/classes"
                     includes="**/*Test.class"
+                    excludes="**/testhelper/**"
                />
             </batchtest>
         </junit>

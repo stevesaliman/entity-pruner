@@ -1,5 +1,5 @@
 # General parameters, like the name and version.
-application.version=2.1.0
+application.version=2.2.0
 
 ########################## Testing Parameters #############################
 # JDBC credentials for unit testing.  In production, we're using the jndi 

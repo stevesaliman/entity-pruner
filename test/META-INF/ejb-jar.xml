@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="ASCII"?>
+<!--  This file is in the test directory, since it won't be in the EntityPruner
+      jar file.  We need to define the EntityPruner bean since it is in the 
+      jar file.  We name it based on the OpenEJB convention since we are
+      using this file for testing. -->
+<ejb-jar xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://java.sun.com/xml/ns/javaee" xmlns:ejb="http://java.sun.com/xml/ns/javaee/ejb-jar_3_0.xsd" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/ejb-jar_3_0.xsd" version="3.0">
+  <display-name>entity-pruner-ejb</display-name>
+  <enterprise-beans>
+    <session>
+      <display-name>EntityPruner</display-name>
+      <ejb-name>EntityPruner</ejb-name>
+      <business-local>com.saliman.entitypruner.EntityPruner</business-local>
+      <ejb-class>com.saliman.entitypruner.EntityPrunerHibernateJpa</ejb-class>
+      <session-type>Stateless</session-type>
+    </session>
+  </enterprise-beans>
+</ejb-jar>
