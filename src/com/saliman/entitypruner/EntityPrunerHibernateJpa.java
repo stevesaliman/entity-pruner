@@ -178,9 +178,9 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
         
         // We can't use the entity's toString() because some entities use 
         // parent objects in their toString() methods, which could be 
-        // uninitialized proxies.
-        String msg = "Error pruning " + entity.getClass() + " " + 
-                     entity + ": ";
+        // uninitialized proxies, which means we can't put the entity in 
+        // messages.
+        String msg = "Error pruning an instance of " + entity.getClass() + ": ";
         try {
             List<Field> fields = loadFields(entity.getClass());
             for ( Field field : fields ) {
@@ -266,9 +266,9 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
         entity.setPruned(false);
         // We can't use the entity's toString() because some entities use 
         // parent objects in their toString() methods, which could be 
-        // uninitialized proxies.
-        String msg = "Error pruning " + entity.getClass() + " " + 
-                     entity + ": ";
+        // uninitialized proxies, which means we can't use the entity in the 
+        // message
+        String msg = "Error unpruning an instance of" + entity.getClass() + ": ";
         try {
             List<Field> fields = loadFields(entity.getClass());
             for ( Field field : fields ) {
