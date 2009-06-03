@@ -19,6 +19,7 @@ import javax.ejb.Stateless;
 import javax.ejb.TransactionAttribute;
 import javax.ejb.TransactionAttributeType;
 import javax.persistence.EntityManager;
+import javax.persistence.Id;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.PersistenceContext;
@@ -48,8 +49,8 @@ import org.hibernate.proxy.LazyInitializer;
  * This class is heavily dependent on the JPA provider and the types of
  * collections Entities have.  This implementation only works with Hibernate, 
  * and at the moment, child collections must be either a <code>Set</code>,
- * <code>SortedSet</code> or <code>List</code>.  In Addition, the entities must
- * use field annotations and not method annotations.
+ * <code>SortedSet</code> or <code>List</code>.  In Addition, the entities
+ * must use field annotations and not method annotations.
  * <p>
  * Since the EntityPruner logs its activity, we recommend Entities implement
  * a <code>toString()</code> method.
@@ -60,7 +61,7 @@ import org.hibernate.proxy.LazyInitializer;
  */
 // we need the stateless annotation to make the unit tests work.
 @Stateless(name="EntityPruner")
-@TransactionAttribute(TransactionAttributeType.NEVER)
+@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
 public class EntityPrunerHibernateJpa implements EntityPruner{
     /** logger for the class */
     private static final Logger LOG = Logger.getLogger(EntityPruner.class);
@@ -78,8 +79,10 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
      * the transaction when it is told, but EJB containers, such as GlassFish, 
      * will create a default transaction when the service endpoint is invoked, 
      * unless the 
-     * <code>TransactionAttribute(TransactionAttributeType.NEVER)<code> 
-     * annotation is present in the endpoint class.<br>
+     * <code>TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)<code> 
+     * annotation is present.  This method will suspend any current 
+     * transaction, but it is undefined what would happen if the pruned 
+     * entity is used by callers that are in an active transaction.<br>
      * In unit tests, the EntityManager.clear method should be called to make
      * sure we are dealing with detached entities.
      * Pruning basically means 3 things:<br>
@@ -108,7 +111,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
      * @param entity the {@link PrunableEntity} to pruned
      * @throws IllegalStateException if there is a problem.
      */
-    @TransactionAttribute(TransactionAttributeType.NEVER)
+    @TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
     public void prune(PrunableEntity entity) {
         // If we have an object graph more than 999 levels deep, we've 
         // got much bigger problems than the obvious bug this hard coded
@@ -125,8 +128,10 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
      * the transaction when it is told, but EJB containers, such as GlassFish, 
      * will create a default transaction when the service endpoint is invoked, 
      * unless the 
-     * <code>TransactionAttribute(TransactionAttributeType.NEVER)<code> 
-     * annotation is present in the endpoint class.<br>
+     * <code>TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)<code> 
+     * annotation is present.  This method will suspend any current 
+     * transaction, but it is undefined what would happen if the pruned 
+     * entity is used by callers that are in an active transaction.<br>
      * In unit tests, the EntityManager.clear method should be called to make
      * sure we are dealing with detached entities.
      * Pruning basically means 3 things:<br>
@@ -164,7 +169,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
      *        children, etc.
      * @throws IllegalStateException if there is a problem.
      */
-    @TransactionAttribute(TransactionAttributeType.NEVER)
+    @TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
     public void prune(PrunableEntity entity, int depth) {
         LOG.trace("prune(PrunableEntity)");
         // First things first.  See if we've already started this one
@@ -238,6 +243,10 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
      * <p>
      * This works well enough to save an entity, but not well enough to 
      * use the un-pruned entity to get previously uninitialized collections.
+     * <p>
+     * Hibernate needs a session to create Proxy collections, so this method
+     * will make sure there is one to make sure we can un-prune even if we
+     * are un-pruning from a non-transactional service layer.
      * @param entity the {@link PrunableEntity} to un-prune
      * @throws IllegalStateException if something goes wrong
      */
@@ -271,6 +280,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
         String msg = "Error unpruning an instance of" + entity.getClass() + ": ";
         try {
             List<Field> fields = loadFields(entity.getClass());
+            Serializable entityId = findPrimaryKey(entity, fields);
             for ( Field field : fields ) {
                 field.setAccessible(true);
                 Object value = getValue(field, entity);
@@ -284,7 +294,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
                     reproxy(entity, (PrunableEntity)value, field, session);
                 } else if ( Collection.class.isAssignableFrom(field.getType()) ) {
                     // un-pruning may result in a new collection.
-                    unpruneCollection(entity, (Collection<?>)value, field);
+                    unpruneCollection(entity, entityId, (Collection<?>)value, field);
                 }
                 // The implied else block is for objects that don't need
                 // un-pruning.  Nothing needs to be done in that case
@@ -415,8 +425,11 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
      * proxy collections so Hibernate doesn't try to disassociate children,
      * which Hibernate will try to do if it sees that the parent went from 
      * having a child collection to not having a child collection. Hibernate
-     * will also try to disassociate children if it sees that the collection is
-     * not a Hibernate proxy object such as PersistentBag or PersistentSet.
+     * will also try to disassociate children if it sees that the collection 
+     * is not a Hibernate proxy object such as PersistentBag or PersistentSet.
+     * This method is responsible for making sure the new Hibernate Persistent
+     * Collection has everything it needs to avoid issues when the un-pruned
+     * entities are later saved to the database.
      * <p>
      * If the collection is not null, this method will detect bidirectional
      * associations and re-inject the parent into each child after un-pruning
@@ -424,9 +437,9 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
      * object twice - it is entirely possible that we hit a child collection
      * before we hit the pruned field.
      * <p>
-     * This method assumes Hibernate as a provider, and that Lists are used
-     * for child collections and not Sets
+     * This method assumes Hibernate as a provider.
      * @param entity the entity containing the collection to un-prune
+     * @param entityId the primary key of the entity.
      * @param collection the child collection to un-prune
      * @param field the field that contains the collection.
      * @throws NoSuchMethodException 
@@ -436,8 +449,9 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
      * @throws IllegalStateException
      */
     private void unpruneCollection(PrunableEntity entity, 
-                                          Collection<?> collection,
-                                          Field field) 
+    		                       Serializable entityId,
+                                   Collection<?> collection,
+                                   Field field) 
                  throws SecurityException, NoSuchMethodException, 
                         IllegalStateException, IllegalAccessException,
                         InvocationTargetException {
@@ -456,9 +470,6 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
             }
         }
         
-        // TODO: change this method so it can handle lists as well as sets
-        // this can be done by using the original field definition and choosing
-        // the correct object accordingly.
         if ( collection == null ) {
             // We only want to put in an empty PersistentSet if:
             // 1. The parent is persistent(it has an id) This is safe because
@@ -466,17 +477,24 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
             // 2. The collection is persistent (not Transient).
             Annotation a = field.getAnnotation(Transient.class);
             if ( (a == null) && (entity.isPersistent() ) ) {
+            	PersistentCollection value = null;
                 Class<?> fieldType = field.getType();
                 if ( SortedSet.class.isAssignableFrom(fieldType) ) {
-                    setValue(field, entity, new PersistentSortedSet());
+                    value = new PersistentSortedSet();
                 } else if ( Set.class.isAssignableFrom(fieldType) ) {
-                    setValue(field, entity, new PersistentSet());
+                	value = new PersistentSet();
                 } else if ( List.class.isAssignableFrom(fieldType) ) {
-                    setValue(field, entity, new PersistentList());
+                	value = new PersistentList();
                 } else {
                     throw new IllegalStateException(fieldType + 
                             " collections are not supported by the EntityPruner");
                 }
+                // Set the collection's snapshot so we don't get
+                // "uninitialized transient collection" type errors.
+                String fieldName = entity.getClass().getName() + "." +
+                                   field.getName();
+                value.setSnapshot(entityId, fieldName, null);
+                setValue(field, entity, value);
             }
         } else {
             // Note that in this case, we'll have a collection that isn't
@@ -720,5 +738,29 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
                 field.set(entity, null);
             }
         }
+    }
+    /**
+     * Helper method to find the value of the primary key for an Entity.
+     * This method uses reflection to find the attribute with the JPA "Id"
+     * annotation.  If the entity doesn't have an "Id" annotation, we have
+     * bigger issues than the correct functioning of this method.
+     * @param entity the entity whose PrimaryKey we want.
+     * @param fields the <code>Field</code>s the entity has.
+     * @return the value of the primary key for the given entity.
+     * @throws InvocationTargetException 
+     * @throws IllegalAccessException 
+     * @throws IllegalArgumentException 
+     * @throws SecurityException 
+     * @throws ClassCastException if the entity contains a non-serializable
+     * ID.
+     */
+    private Serializable findPrimaryKey(PrunableEntity entity, List<Field> fields) throws SecurityException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+    	for ( Field field : fields ) {
+            Annotation a = field.getAnnotation(Id.class);
+            if ( a != null ) {
+            	return (Serializable)getValue(field, entity);
+            }
+    	}
+    	return null;
     }
 }

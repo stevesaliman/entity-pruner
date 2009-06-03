@@ -527,6 +527,127 @@ public class EntityPrunerSetTest extends AbstractEjb3ContainerTest  {
     }
 
     /**
+     * Try loading a childless parent, pruning, un-pruning, then saving the
+     * parent.  This makes sure the un-pruner correctly recreates the proxy
+     * collection.
+     * @throws Exception if anything goes badly.
+     */
+    @Test
+    public void updateChildlessParent() throws Exception {
+        // This test spans transactions, so set rollback to false.
+        setDefaultRollback(false);
+        runInTransaction(new Transactable() {
+            public void run() throws Exception {
+                deleteData(); // in case some other test did a commit.
+                createData();
+                parent = parentDao.findById(TEST_CHILDLESS_ID);
+                parentRows = countRowsInTable(PARENT_TABLE);
+                childRows = countRowsInTable(CHILD_TABLE);
+                uniChildRows = countRowsInTable(UNI_CHILD_TABLE);
+            }
+        });
+        
+        // prune the parent outside a transaction and make sure we get what 
+        // we were expecting.
+        pruner.prune(parent);
+        children = parent.getChildren();
+        assertNull("Prune should have pruned unfetched children",
+                   children);
+        uniChildren = parent.getUniChildren();
+        assertNull("Prune should have pruned unfetched uniChildren",
+                      uniChildren);
+        String newDesc = "Updated by updateChildlessParent";
+        parent.setDescription(newDesc);
+        runInTransaction(new Transactable() {
+        	public void run() throws Exception {
+        		pruner.unprune(parent);
+        		// This time, our null sets should be replaced with PersistentLists.
+        		children = parent.getChildren();
+        		assertNotNull("Unprune should have created a List for children",
+        				children);
+        		uniChildren = parent.getUniChildren();
+        		assertNotNull("Unprune should have created a List for uniChildren",
+        				uniChildren);
+        
+                parent = parentDao.save(parent);
+                assertEquals("Shouldn't have changed parent count", 
+                        parentRows, countRowsInTable(PARENT_TABLE));
+                assertEquals("Shouldn't have changed child count", 
+                        childRows, countRowsInTable(CHILD_TABLE));
+                assertEquals("Shouldn't have changed uniChild count", 
+                        uniChildRows, countRowsInTable(UNI_CHILD_TABLE));
+                // don't forget to clean up
+                deleteData();
+            }
+        });
+    }
+
+    /**
+     * Try loading the childless parent and pruning.  Un-prune it and copy
+     * the un-pruned child collections in to a new copy of the childless 
+     * parent fetch from the database.  This will test whether or not the 
+     * un-prune method is creating the uninitialized proxy collections 
+     * properly.  This simulates an actual application scenario where only a
+     * part of an incoming entity was copied into a persistent entity for 
+     * security purposes.  The observed behavior was an exception due to an 
+     * uninitialized transient collection.
+     * @throws Exception if anything goes badly.
+     */
+    @Test
+    public void updateCopyOfChildlessParent() throws Exception {
+        // This test spans transactions, so set rollback to false.
+        setDefaultRollback(false);
+        runInTransaction(new Transactable() {
+            public void run() throws Exception {
+                deleteData(); // in case some other test did a commit.
+                createData();
+                parent = parentDao.findById(TEST_CHILDLESS_ID);
+                parentRows = countRowsInTable(PARENT_TABLE);
+                childRows = countRowsInTable(CHILD_TABLE);
+                uniChildRows = countRowsInTable(UNI_CHILD_TABLE);
+            }
+        });
+        
+        // prune the parent outside a transaction and make sure we get what 
+        // we were expecting.
+        pruner.prune(parent);
+        children = parent.getChildren();
+        assertNull("Prune should have pruned unfetched children",
+                   children);
+        uniChildren = parent.getUniChildren();
+        assertNull("Prune should have pruned unfetched uniChildren",
+                      uniChildren);
+        runInTransaction(new Transactable() {
+        	public void run() throws Exception {
+        		pruner.unprune(parent);
+        		// This time, our null sets should be replaced with PersistentLists.
+        		children = parent.getChildren();
+        		assertNotNull("Unprune should have created a List for children",
+        				children);
+        		uniChildren = parent.getUniChildren();
+        		assertNotNull("Unprune should have created a List for uniChildren",
+        				uniChildren);
+        
+        		// Load the copy
+        		TestSetParentEntity copy = parentDao.findById(TEST_CHILDLESS_ID);
+        		copy.setChildren(parent.getChildren());
+        		copy.setUniChildren(parent.getUniChildren());
+                String newDesc = "Updated by updateChildlessParent";
+                copy.setDescription(newDesc);
+                copy = parentDao.save(copy);
+                assertEquals("Shouldn't have changed parent count", 
+                        parentRows, countRowsInTable(PARENT_TABLE));
+                assertEquals("Shouldn't have changed child count", 
+                        childRows, countRowsInTable(CHILD_TABLE));
+                assertEquals("Shouldn't have changed uniChild count", 
+                        uniChildRows, countRowsInTable(UNI_CHILD_TABLE));
+                // don't forget to clean up
+                deleteData();
+            }
+        });
+    }
+
+    /**
      * Try loading a parent with children.  Make sure the children load 
      * from the database and prune to a depth of 1.  Make sure the children
      * are now null.
