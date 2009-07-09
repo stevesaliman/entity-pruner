@@ -2,6 +2,7 @@ package com.saliman.entitypruner;
 
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -311,7 +312,13 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
         } catch (NoSuchMethodException e) {
             msg = msg + e.getMessage();
             throw new IllegalStateException(msg, e);
-        }
+        } catch (IllegalArgumentException e) {
+            msg = msg + e.getMessage();
+            throw new IllegalStateException(msg, e);
+		} catch (InstantiationException e) {
+            msg = msg + e.getMessage();
+            throw new IllegalStateException(msg, e);
+		}
     }
 
     /**
@@ -704,11 +711,15 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
      * objects.
      * @throws IllegalArgumentException
      * @throws IllegalAccessException
+     * @throws InvocationTargetException 
+     * @throws InstantiationException 
+     * @throws NoSuchMethodException 
+     * @throws SecurityException 
      * @throws ClassCastException if the fieldIdMap contains a non-serializable
      * ID.
      */
     private void reproxy(PrunableEntity entity, PrunableEntity value,
-            Field field, SessionImpl session) throws IllegalArgumentException, IllegalAccessException {
+            Field field, SessionImpl session) throws IllegalArgumentException, IllegalAccessException, SecurityException, NoSuchMethodException, InstantiationException, InvocationTargetException {
         field.setAccessible(true);
         // if value, we got good data, it means the client gave us real data,
         // unprune it.
@@ -731,6 +742,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
                 // stored the id otherwise.  When I am in a less lazy mood, I'll 
                 // look at annotations to determine nullability.
                 Object newValue = null;
+                proxyEntityId = convertPrimaryKey(field.getType(), proxyEntityId);
                 newValue = session.internalLoad(field.getType().getName(), 
                                                 proxyEntityId, false, true);
                 field.set(entity, newValue);
@@ -762,5 +774,37 @@ public class EntityPrunerHibernateJpa implements EntityPruner{
             }
     	}
     	return null;
+    }
+
+    /**
+     * Helper method to convert the primary key to the right class.  Most of
+     * the time the type will be correct, but numbers prove to be 
+     * particularly problematic.  For example, an Id that started out as a 
+     * Long, becomes an Integer after a round trip through BlazeDS. 
+     * @param entityClass The class of the entity holding the ID.
+     * @param id The current value of the id.
+     * @return the id, converted to the correct class.
+     * @throws NoSuchMethodException 
+     * @throws SecurityException 
+     * @throws InvocationTargetException 
+     * @throws IllegalAccessException 
+     * @throws InstantiationException 
+     * @throws IllegalArgumentException 
+     * @throws ClassCastException if the id is non-serializable
+     */
+    private Serializable convertPrimaryKey(Class<?> entityClass, Object id) throws SecurityException, NoSuchMethodException, IllegalArgumentException, InstantiationException, IllegalAccessException, InvocationTargetException {
+    	Serializable newId = (Serializable)id;
+    	if ( Number.class.isAssignableFrom(id.getClass()) ) {
+        	for ( Field field : loadFields(entityClass) ) {
+                Annotation a = field.getAnnotation(Id.class);
+                if ( a != null ) {
+                	// All of the number classes have constructors that
+                	// accept a string.
+                	Constructor<?> c = field.getType().getConstructor(String.class);
+                	newId = (Serializable)c.newInstance(id.toString());
+                }
+        	}
+    	}
+    	return newId;
     }
 }
