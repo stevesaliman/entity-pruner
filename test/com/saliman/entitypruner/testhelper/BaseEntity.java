@@ -114,7 +114,7 @@ public abstract class BaseEntity implements Serializable, PrunableEntity {
     private boolean pruned = false; // transient, so primitive is OK.
 
     @Transient
-    private Map<String, Object> fieldIdMap;
+    private Map<String, String> fieldIdMap;
 
     /**
      * The default constructor
@@ -184,7 +184,7 @@ public abstract class BaseEntity implements Serializable, PrunableEntity {
      * @return the fieldIdMap for the EntityPruner to use.
      */
     @Override
-    public Map<String, Object> getFieldIdMap() {
+    public Map<String, String> getFieldIdMap() {
         return fieldIdMap;
     }
 
@@ -192,7 +192,7 @@ public abstract class BaseEntity implements Serializable, PrunableEntity {
      * @param fieldIdMap the fieldIdMap to set from the EntityPruner
      */
     @Override
-    public void setFieldIdMap(Map<String, Object> fieldIdMap) {
+    public void setFieldIdMap(Map<String, String> fieldIdMap) {
         this.fieldIdMap = fieldIdMap;
     }
 

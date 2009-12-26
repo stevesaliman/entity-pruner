@@ -58,7 +58,7 @@ import com.saliman.entitypruner.testhelper.set.TestSetUniChildEntity;
  * 
  * @author Steven C. Saliman
  */
-public class EntityPrunerSetTest extends AbstractEjb3ContainerTest  {
+public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  {
     // These constant names reflect OpenEjb naming conventions. We'll need to
     // change these to reflect embedded GlassFish when we switch.
     private static final String PARENT_DAO_NAME = "TestSetParentDaoLocal";
@@ -104,7 +104,7 @@ public class EntityPrunerSetTest extends AbstractEjb3ContainerTest  {
     /**
      * Default Constructor, initializes logging.
      */
-    public EntityPrunerSetTest() {
+    public EntityPrunerHibernateJpaSetTest() {
         super();
     }
 
@@ -1286,4 +1286,259 @@ public class EntityPrunerSetTest extends AbstractEjb3ContainerTest  {
         assertNull("A parent's children should be lazy-loaded, therefore null. Parent NOT pruned",
                 parent.getChildren());
     }
+
+    /**
+	 * Test fetching all children, then pruning with no args.  We should keep
+	 * all children.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void fetchAllPruneUnlimited() throws Exception {
+	    runInTransaction(new Transactable() {
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a child set",
+	            parent.getChildren());
+	    assertNotNull("Test  should start with a uniChild set",
+	            parent.getUniChildren());
+	    pruner.prune(parent);
+	    assertNotNull("pruner should NOT have pruned the child set",
+	            parent.getChildren());
+	    assertNotNull("pruner should NOT have pruned the uniChild set",
+	            parent.getUniChildren());
+	}
+
+	/** 
+     * Try fetching all children, then pruning to a level of 1. We should 
+     * lose all children.
+     * @throws Exception if anything goes badly.
+     */
+    @Test
+    public void fetchAllPruneToDepth() throws Exception {
+	    runInTransaction(new Transactable() {
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a child set",
+	            parent.getChildren());
+	    assertNotNull("Test  should start with a uniChild set",
+	            parent.getUniChildren());
+	    pruner.prune(parent, 1);
+	    assertNull("pruner should have pruned the child set",
+	            parent.getChildren());
+	    assertNull("pruner should have pruned the uniChild set",
+	            parent.getUniChildren());
+    }
+
+	/** 
+     * Try fetching all children, then pruning to a level of 1. We should 
+     * lose all children.  Tests an exclude list of one.
+     * @throws Exception if anything goes badly.
+     */
+    @Test
+    public void fetchAllPruneExcludeChild() throws Exception {
+	    runInTransaction(new Transactable() {
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a child set",
+	            parent.getChildren());
+	    assertNotNull("Test  should start with a uniChild set",
+	            parent.getUniChildren());
+	    pruner.prune(parent, 10, "children");
+	    assertNull("pruner should have pruned the child set",
+	            parent.getChildren());
+	    assertNotNull("pruner should NOT have pruned the uniChild set",
+	            parent.getUniChildren());
+    }
+
+	/** 
+     * Try fetching all children, then pruning, excluding all children. Tests
+     * the ability to parse the exclude list. 
+     * @throws Exception if anything goes badly.
+     */
+    @Test
+    public void fetchAllPruneExcludeAll() throws Exception {
+	    runInTransaction(new Transactable() {
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a child set",
+	            parent.getChildren());
+	    assertNotNull("Test  should start with a uniChild set",
+	            parent.getUniChildren());
+	    pruner.prune(parent, 10, "children, uniChildren");
+	    assertNull("pruner should have pruned the child set",
+	            parent.getChildren());
+	    assertNull("pruner should have pruned the uniChild set",
+	            parent.getUniChildren());
+    }
+
+	/** 
+     * Try fetching all children, then pruning, excluding one child and an 
+     * invalid attribute. Tests  to make sure an invalid attribute doesn't 
+     * prevent the pruner from pruning the valid ones. 
+     * @throws Exception if anything goes badly.
+     */
+    @Test
+    public void fetchAllPruneExcludeOneWithInvalud() throws Exception {
+	    runInTransaction(new Transactable() {
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a child set",
+	            parent.getChildren());
+	    assertNotNull("Test  should start with a uniChild set",
+	            parent.getUniChildren());
+	    pruner.prune(parent, 10, "asdf,children ");
+	    assertNull("pruner should have pruned the child set",
+	            parent.getChildren());
+	    assertNotNull("pruner should have NOT pruned the uniChild set",
+	            parent.getUniChildren());
+    }
+
+    /**
+	 * Test fetching all children, then pruning with invalid excludes.  We 
+	 * should keep all children.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void fetchAllPruneInvalidExclude() throws Exception {
+	    runInTransaction(new Transactable() {
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a child set",
+	            parent.getChildren());
+	    assertNotNull("Test  should start with a uniChild set",
+	            parent.getUniChildren());
+	    pruner.prune(parent, 10, "blahblahblah");
+	    assertNotNull("pruner should NOT have pruned the child set",
+	            parent.getChildren());
+	    assertNotNull("pruner should NOT have pruned the uniChild set",
+	            parent.getUniChildren());
+	}
+
+    /**
+	 * Test fetching no children, then pruning.  We shouldn't have any 
+	 * collections.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void fetchNonePrune() throws Exception {
+	    runInTransaction(new Transactable() {
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	        };
+	    });
+	    pruner.prune(parent, 10);
+	    assertNull("pruner should have pruned the child set",
+	            parent.getChildren());
+	    assertNull("pruner should have pruned the uniChild set",
+	            parent.getUniChildren());
+	}
+
+    /**
+	 * Test fetching no children, then pruning, excluding children.  We 
+	 * shouldn't have any collections.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void fetchNonePruneExclude() throws Exception {
+	    runInTransaction(new Transactable() {
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	        };
+	    });
+	    pruner.prune(parent, 10, "children");
+	    assertNull("pruner should have pruned the child set",
+	            parent.getChildren());
+	    assertNull("pruner should have pruned the uniChild set",
+	            parent.getUniChildren());
+	}
+
+	/**
+	 * Try fetching all children, then excluding a valid, non-child attribute.
+	 * This shouldn't change anything.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void fetchAllPruneNonCollection() throws Exception {
+	    runInTransaction(new Transactable() {
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a code", parent.getCode());
+	    assertNotNull("Test should start with a child list",
+	            parent.getChildren());
+	    assertNotNull("Test  should start with a uniChild list",
+	            parent.getUniChildren());
+	    pruner.prune(parent, 10, "code");
+	    assertNotNull("Test should start with a code", parent.getCode());
+	    assertNotNull("pruner should NOT have pruned the child list",
+	            parent.getChildren());
+	    assertNotNull("pruner should NOT have pruned the uniChild list",
+	            parent.getUniChildren());
+	}
+	
+	/**
+	 * Try finding a child, then prune the parent.  This should not do 
+	 * do anything.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void loadChildPrune() throws Exception {
+	    runInTransaction(new Transactable() {
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                child = childDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a parent");
+	    pruner.prune(child, 10, "parent");
+	    assertNotNull("Test should not have pruned parent");
+	}
 }
