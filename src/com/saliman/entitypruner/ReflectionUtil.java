@@ -5,6 +5,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 /**
@@ -13,7 +15,10 @@ import org.apache.log4j.Logger;
  * @author Steven C. Saliman
  */
 public class ReflectionUtil {
-    /** logger for the class */
+	// caches to try and avoid the performance hit of reflection.
+	private static Map<String, List<Field>> beanFieldMap = new ConcurrentHashMap<String, List<Field>>(200, 0.75F, 100);
+    private static Map<String, Field>fieldMap = new ConcurrentHashMap<String, Field>(200, 0.75F, 100);
+	/** logger for the class */
     private static final Logger LOG = Logger.getLogger(ReflectionUtil.class);
 
     /**
@@ -53,16 +58,30 @@ public class ReflectionUtil {
      */
     public static List<Field> loadBeanFields(Class<?> clazz, 
     		boolean includeReadOnly ) {
+    	
         // The parent of Object is null, so this will be called once.
         // This is where we create the list that we will populate on the way
         // up the stack
-        List<Field> fieldList = null;
         if ( clazz == null ) {
             return new ArrayList<Field>();
         }
-        LOG.trace("loadBeanFields(" + clazz.getName() + ")");
-        // start with the parent, then add this class' fields
-        fieldList = loadBeanFields(clazz.getSuperclass());
+        
+        // The hash key must include whether or not we wanted read-only fields
+        // or not because some callers will want them, others won't, and we
+        // need a place for both lists.
+        String className = clazz.getName();
+        String hashKey = className + Boolean.toString(includeReadOnly);
+    	// First, let's see if we can get lucky in the cache.
+    	if ( beanFieldMap.containsKey(hashKey)) {
+    		return beanFieldMap.get(hashKey);
+    	}
+
+        LOG.trace("loadBeanFields(" + className + ")");
+        // start with the parent, then add this class' fields. We need a 
+        // separate list so that we don't wind up with the same object
+        // stored for multiple classes.
+        List<Field> tmpList = loadBeanFields(clazz.getSuperclass());
+        List<Field> fieldList = new ArrayList<Field>(tmpList);
         Field[] fields = clazz.getDeclaredFields();
         String suffix;
         for ( int i=0 ; i < fields.length ; i++ ) {
@@ -83,9 +102,43 @@ public class ReflectionUtil {
                 fieldList.add(fields[i]);
             }
         }
+        beanFieldMap.put(hashKey, fieldList);
         return fieldList;
     }
     
+    /**
+     * Gets the named field from a class.  We can't just use Class.getField
+     * because it only gets public fields.  This method gets private fields, 
+     * and it will get it from parent classes as well.
+     * @param clazz the class with the field we want.
+     * @param name the name of the field we want.
+     * @return the <code>Field</code> we want, or null if the field doesn't
+     *         exist in the given class.
+     */
+    public static Field getField(Class<?> clazz, String name) {
+    	if ( clazz == null || name == null ) {
+    		return null;
+    	}
+    	
+    	String fullName = clazz.getName() + "." + name;
+    	if ( fieldMap.containsKey(fullName)) {
+    		return fieldMap.get(fullName);
+    	}
+    	// Try to get it from the superclass first.
+    	Field field = getField(clazz.getSuperclass(), name);
+    	// Now try to see if the class overrides it.
+    	Field[] fields = clazz.getDeclaredFields();
+    	for ( Field f : fields ) {
+    		if (f.getName().equals(name)) {
+    			field = f;
+    		}
+    	}
+    	if ( field != null ) {
+    		fieldMap.put(fullName, field);
+    	}
+    	return field;
+    }
+
     /**
 	 * Gets the value from the given field.  We can't just use field.get 
 	 * because Hibernate doesn't always store the value in the field. It seems

@@ -2,10 +2,14 @@ package com.saliman.entitypruner;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Set;
+
+import javax.persistence.Transient;
 
 import org.junit.After;
 import org.junit.Before;
@@ -123,5 +127,70 @@ public class ReflectionUtilTest {
         field = list.get(5);
         assertEquals("The 'noSetter' attribute should be sixth", "noSetter", field.getName());
         assertEquals("The 'noSetter' attribute is the wrong type", long.class, field.getType());       
+    }
+    
+    /**
+     * Try getting a field from a class directly.
+     */
+    @Test
+    public void getFieldDirect() {
+    	Field f = ReflectionUtil.getField(TestClass.class, "bool");
+    	assertNotNull("Failed to get field", f);
+    	assertEquals("Got wrong field", "bool", f.getName());
+    }
+    
+    /**
+     * Try getting a field from the middle of a hierarchy.  This is also good
+     * because this one is private and has no accessors.
+     */
+    @Test
+    public void getFieldMiddle() {
+    	Field f = ReflectionUtil.getField(TestClass.class, "noAccessors");
+    	assertNotNull("Failed to get field", f);
+    	assertEquals("Got wrong field", "noAccessors", f.getName());
+    }
+    
+    /**
+     * Try getting a field from the top of a hierarchy.  This also tests 
+     * getting a field from an abstract class.
+     */
+    @Test
+    public void getFieldTop() {
+    	Field f = ReflectionUtil.getField(TestClass.class, "string");
+    	assertNotNull("Failed to get field", f);
+    	assertEquals("Got wrong field", "string", f.getName());
+    }
+    
+    /**
+     * Try getting a field that is in more than one class. The field is only
+     * annotated in one of them, so we'll see if reflectionUtil gave us the
+     * one we wanted. "multi"
+     */
+    @Test
+    public void getFieldMulti() {
+    	Field f = ReflectionUtil.getField(TestClass.class, "multi");
+    	assertNotNull("Failed to get field", f);
+    	assertEquals("Got wrong field", "multi", f.getName());
+    	// check the annotation to see if we got the right one.
+    	Annotation a = f.getAnnotation(Transient.class);
+    	assertNotNull("Got wrong field - missing annotation", a);
+    }
+    
+    /**
+     * Try getting a field with no class
+     */
+    @Test
+    public void getFieldNoClass() {
+    	Field f = ReflectionUtil.getField(null, "bool");
+    	assertNull("Shouldn't have gotten a field", f);
+    }
+    
+    /**
+     * Try getting a field with no name.
+     */
+    @Test
+    public void getFieldNoName() {
+    	Field f = ReflectionUtil.getField(TestClass.class, null);
+    	assertNull("Shouldn't have gotten a field", f);
     }
 }

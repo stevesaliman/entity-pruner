@@ -1,5 +1,5 @@
 # General parameters, like the name and version.
-application.version=2.2.1
+application.version=3.0.0
 
 ########################## Testing Parameters #############################
 # JDBC credentials for unit testing.  In production, we're using the jndi 
@@ -26,7 +26,7 @@ app.log.level=DEBUG
 default.log.level=WARN
 # Fully qualified name of the unit test log4j log dir. Used to derive both log
 # files.
-test.log.dir=e:/projects/framework
+test.log.dir=/usr/local/projects/entity-pruner
 # prefix for log files.
-test.log.prefix=framework
+test.log.prefix=entity-pruner
 

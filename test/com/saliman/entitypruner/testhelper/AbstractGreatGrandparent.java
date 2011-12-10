@@ -30,7 +30,7 @@ public abstract class AbstractGreatGrandparent {
     /** Constant for method return value */
     public static final int INTEGER_STRING_STRING = 9;
     /** Constant for method return value */
-    public static final int JDIALOG_STRING = 10;
+    public static final int URL_STRING = 10;
     /** Constant for method return value */
     public static final int DATE_STRING_STRING = 11;
     /** Constant for method return value */

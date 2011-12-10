@@ -1,8 +1,7 @@
 package com.saliman.entitypruner.testhelper;
 
+import java.net.URL;
 import java.util.Date;
-
-import javax.swing.JDialog;
 
 /**
  * This class is used to test the getMethod method of the TestBase class.
@@ -12,6 +11,9 @@ import javax.swing.JDialog;
 public class Grandparent extends AbstractGreatGrandparent {
     @SuppressWarnings("unused")
     private String noAccessors; // shouldn't be loaded by the beanFieldLoader.
+
+    @SuppressWarnings("unused")
+    private String multi;
 
 
     /** 
@@ -28,8 +30,8 @@ public class Grandparent extends AbstractGreatGrandparent {
      * This method is used to determine if we can execute a private method
      */
     @SuppressWarnings("unused")
-    private int method(JDialog j, String s) {
-        return JDIALOG_STRING;
+    private int method(URL u, String s) {
+        return URL_STRING;
     }
     
     /**

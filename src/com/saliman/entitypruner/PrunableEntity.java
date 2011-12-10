@@ -2,29 +2,32 @@ package com.saliman.entitypruner;
 
 import java.util.Map;
 
-
 /**
  * Classes implement this interface to mark it as being prunable by the 
  * {@link EntityPruner}.  Entities must be pruned before they can be Serialized
  * or Marshalled for sending to a remote client.
  * <p> 
  * Implementing this interface means that entities will implement
- * accessors for &quot;pruned&quot; and &quot;fieldIdMap&quot; attributes, as
- * well as a method to determine if the Entity is persistent or not.
+ * accessors for &quot;prunedState&quot; and &quot;fieldIdMap&quot; 
+ * attributes, as well as a method to determine if the Entity is persistent or
+ * not.
  * <p>
- * The pruned attribute is used by the {@link EntityPruner} to determine if 
- * a given entity has already been pruned. The default value of the pruned
- * attribute <b>needs</b> to be <code>false</code>, so that JPA entities are 
- * created correctly on the server during a query. If an RMI client needs to
- * create an entity in the client, it should be OK to leave it false, since an
- * incoming new entity will look the same to JPA as one that was created 
- * inside server code (as far as nulls and ordinary Collections are concerned).
+ * The pruningState attribute is used by the {@link EntityPruner} to determine
+ * if a given entity has already been pruned, and how. The default value of 
+ * the pruned attribute <b>needs</b> to be <code>UNPRUNED_COMPLETE</code>, so
+ * that JPA entities are created correctly on the server during a query. If an
+ * RMI client needs to create an entity in the client, it should be OK to 
+ * leave it null, since an incoming new entity will look the same to JPA as 
+ * one that was created inside server code (as far as nulls and ordinary 
+ * Collections are concerned).  Server code that tries to update an entity
+ * should probably look at the prunedState attribute and only allow an update
+ * if the state is <code>UNPRUNED_COMPLETE</code>
  * <p>
  * The fieldIdMap attribute is used by the {@link EntityPruner} to store
  * the field name and ID of proxied parent entities when the parent entity 
  * hasn't been loaded yet.
  * <p>
-  * A class wishing to be prunable must have as it's ID a class that has a 
+ * A class wishing to be prunable must have as it's ID a class that has a 
  * <code>toString</code> method and a constructor that takes creates an 
  * instance from that string. All Java number classes currently fit that
  * description.
@@ -42,20 +45,24 @@ import java.util.Map;
  * can convert back and forth to a String.  To use something like a date, 
  * the class would need to be sub-classed to be used. (but you don't want to
  * use a date as the primary key, do you?)
- * 
+ * <p>
+ * It is also strongly recommended, though not required, that Entities also
+ * implement a <code>toString()</code> method to make the log entries more
+ * meaningful.
  * @author Steven C. Saliman
  * @see EntityPruner for more details about pruning entities.
  */
 public interface PrunableEntity {
-    /**
-     * @return whether or not this entity has already been pruned.
+	/**
+     * @return The current pruning state of the entity.  The EntityPruner
+     * considers a null state to be UNPRUNED_PARTIAL.
      */
-    public boolean isPruned();
+    public String getPruningState();
     
     /**
-     * @param pruned whether or not this entity should be marked as pruned.
+     * @param pruningState The state to set
      */
-    public void setPruned(boolean pruned);
+    public void setPruningState(String pruningState);
     
     /**
      * @return the map of field to ID mappings.
@@ -66,7 +73,7 @@ public interface PrunableEntity {
      * @param fieldIdMap the map of field to ID mappings to use.
      */
     public void setFieldIdMap(Map<String, String> fieldIdMap);
-
+    
     /**
      * Determine if the Entity has been saved to the database or not.  The
      * Entity Pruner needs to know this in order to know whether or not to 
@@ -78,5 +85,4 @@ public interface PrunableEntity {
      * has been persisted to the database.
      */
     public boolean isPersistent();
-    
 }

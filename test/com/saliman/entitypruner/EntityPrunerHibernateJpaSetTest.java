@@ -8,11 +8,12 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.math.BigInteger;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-import javax.persistence.EntityExistsException;
 import javax.persistence.PersistenceException;
 
 import org.hibernate.collection.PersistentSet;
@@ -32,8 +33,8 @@ import com.saliman.entitypruner.testhelper.set.TestSetUniChildEntity;
 
 /**
  * The test class for the BaseDaoJpa class was getting ridiculously
- * long, so it has been split into 3 separate test classes.  This class tests
- * how the BaseDao operates when dealing with pruning and un-pruning.
+ * long, so it has been split into several separate test classes.  This class
+ * tests how the BaseDao operates when dealing with pruning and un-pruning.
  * <p>
  * This class uses the TestParentDaoJpa, TestChildDaoJpa, and
  * TestUniChildDaoJpa helper DAOs to test the methods in {@link BaseDaoJpa}
@@ -56,6 +57,9 @@ import com.saliman.entitypruner.testhelper.set.TestSetUniChildEntity;
  * If you do choose to commit transactions, you will need to restore the 
  * database to its original state.
  * 
+ * @see BaseDaoJpaTest
+ * @see BaseDaoJpaSetTest
+ * @see BaseDaoJpaQuerySetTest 
  * @author Steven C. Saliman
  */
 public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  {
@@ -100,6 +104,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
     private int childRows = -1;
     private int uniChildRows = -1;
     private int numTransChild = -1;
+    private Map<String, String> options;
 
     /**
      * Default Constructor, initializes logging.
@@ -212,9 +217,47 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         parent = null;
         parentDao = null;
         pruner = null;
+        if ( options != null ) {
+        	options.clear();
+        	options = null;
+        }
     }
 
-    /** 
+    /**
+	 * This tests what happens when we access the children of an un-pruned
+	 * object from another transaction.  This simulates what happens when we
+	 * un-prune at the service layer, and try to use the objects in the
+	 * business layer.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void accessUnprunedParentAndChildren() throws Exception {
+	    parent.setUniChildren(null);
+	    parent.setPruningState(PruningState.PRUNED_COMPLETE);
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	            pruner.unprune(parent);
+	        };
+	    });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
+	    assertNotNull("unpruning should have kept the a child set",
+	            parent.getChildren());
+	    assertNull("unpruning should not have created a uniChild set",
+	            parent.getUniChildren());
+	    assertNull("unpruning should not have created a transChild set",
+	            parent.getTransChildren());
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	            assertEquals("unpruning should not have changed the child count",
+	            		1, parent.getChildren().size());
+	        }
+	    });
+	}
+
+	/** 
      * Try the following sequence of events:
      * Create a new parent object with null children and uni-children.
      * Un-prune the object.  Do we get an empty PersistentSet?
@@ -226,12 +269,15 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
     public void insertUnprunedParentNullChildren() throws Exception {
         parent.setChildren(null);
         parent.setUniChildren(null);
-        parent.setPruned(true);
-        runInTransaction(new Transactable() {
+	    parent.setPruningState(PruningState.PRUNED_COMPLETE);
+	    runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         assertNull("unpruning should not have created a child set",
                 parent.getChildren());
         assertNull("unpruning should not have created a uniChild set",
@@ -239,6 +285,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         assertNull("unpruning should not have created a transChild set",
                 parent.getTransChildren());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -265,12 +312,15 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
     @Test
     public void insertUnprunedParentAndChildren() throws Exception {
         parent.setUniChildren(null);
-        parent.setPruned(true);
-        runInTransaction(new Transactable() {
+	    parent.setPruningState(PruningState.PRUNED_COMPLETE);
+	    runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         assertNotNull("unpruning should have kept the a child set",
                 parent.getChildren());
         assertNull("unpruning should not have created a uniChild set",
@@ -278,6 +328,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         assertNull("unpruning should not have created a transChild set",
                 parent.getTransChildren());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -309,13 +360,17 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
     @Test
     public void insertUnprunedParentAndUniChildren() throws Exception {
         parent.setChildren(null);
-        parent.setPruned(true);
+	    parent.setPruningState(PruningState.PRUNED_COMPLETE);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -325,7 +380,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
                         parent.getUniChildren());
                 assertNull("unpruning should not have created a transChild set",
                         parent.getTransChildren());
-                assertEjbThrows(EntityExistsException.class, parentDao, "save", parent);
+                assertEjbThrows(PersistenceException.class, parentDao, "save", parent);
             }
         });
     }
@@ -341,12 +396,15 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         parent.setTransChildren(parent.getChildren());
         parent.setChildren(null);
         parent.setUniChildren(null);
-        parent.setPruned(true);
+	    parent.setPruningState(PruningState.PRUNED_COMPLETE);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         assertNull("unpruning should not have created the a child set",
                 parent.getChildren());
         assertNull("unpruning should not have created a uniChild set",
@@ -354,6 +412,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         assertNotNull("unpruning should have kept a transChild set",
                 parent.getTransChildren());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -390,6 +449,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         transChildren = new HashSet<TestSetChildEntity>(parent.getChildren().size());
         transChildren.addAll(parent.getChildren());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -404,6 +464,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // prune the object outside the transaction.  Change description and
         // un-prune.
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         assertNull("Prune should have nulled out the unitialized child set",
                 parent.getChildren());
         assertNull("Prune should have nulled out the unitialized uniChild set",
@@ -412,10 +474,13 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
                 parent.getTransChildren());
         parent.setDescription("Updated by updateParentWithoutFetchingChildren");
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         // This time, our null sets should be replaced with PersistentSets.
         children = parent.getChildren();
         assertNotNull("Unprune should have created a PersistentSet for children",
@@ -429,6 +494,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
                 PersistentSet.class.isAssignableFrom(uniChildren.getClass()));
         // Save the changed object in a new transaction.
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 parent = parentDao.save(parent);
                 assertEquals("Shouldn't have changed parent count", 
@@ -459,6 +525,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // This test spans transactions, so set rollback to false.
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -477,6 +544,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // prune the parent outside a transaction and make sure we get what 
         // we were expecting.
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         children = parent.getChildren();
         assertNotNull("Prune should not null fetched children",
                 children);
@@ -496,10 +565,13 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
             u.setDescription(newDesc);
         }
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         // This time, our null sets should be replaced with PersistentSets.
         children = parent.getChildren();
         assertNotNull("Unprune should have created a Set for children",
@@ -510,6 +582,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         
         // Save the updated object in a new transaction
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 parent = parentDao.save(parent);
                 assertEquals("Shouldn't have changed parent count", 
@@ -537,6 +610,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // This test spans transactions, so set rollback to false.
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -550,6 +624,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // prune the parent outside a transaction and make sure we get what 
         // we were expecting.
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         children = parent.getChildren();
         assertNull("Prune should have pruned unfetched children",
                    children);
@@ -559,6 +635,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         String newDesc = "Updated by updateChildlessParent";
         parent.setDescription(newDesc);
         runInTransaction(new Transactable() {
+            @Override
         	public void run() throws Exception {
         		pruner.unprune(parent);
         		// This time, our null sets should be replaced with PersistentLists.
@@ -580,6 +657,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
                 deleteData();
             }
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
     }
 
     /**
@@ -598,6 +677,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // This test spans transactions, so set rollback to false.
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -611,6 +691,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // prune the parent outside a transaction and make sure we get what 
         // we were expecting.
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         children = parent.getChildren();
         assertNull("Prune should have pruned unfetched children",
                    children);
@@ -618,6 +700,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         assertNull("Prune should have pruned unfetched uniChildren",
                       uniChildren);
         runInTransaction(new Transactable() {
+            @Override
         	public void run() throws Exception {
         		pruner.unprune(parent);
         		// This time, our null sets should be replaced with PersistentLists.
@@ -645,6 +728,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
                 deleteData();
             }
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
     }
 
     /**
@@ -659,6 +744,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // disable rollback.
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -679,11 +765,14 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         assertTrue("Failed to fetch Children", parent.getChildren().size() > 0);
         assertTrue("Failed to fetch uniChildren", parent.getUniChildren().size() > 0);
         pruner.prune(parent, 1);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         assertNull("We shouldn't have children anymore", parent.getChildren());
         assertNull("We shouldn't have uniChildren anymore", parent.getUniChildren());
         assertNull("We shouldn't have transient children anymore", parent.getTransChildren());
         // Make sure the counts aren't affected.
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 assertEquals("Shouldn't have changed parent count", 
                         parentRows, countRowsInTable(PARENT_TABLE));
@@ -707,6 +796,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
     @Test
     public void pruneChildlessParent() throws Exception {
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -717,6 +807,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         });
         // prune the entity outside a transaction.
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         assertNotNull("Should still have child set", parent.getChildren());
         assertEquals("Should have empty child set",
                 0, parent.getChildren().size());
@@ -728,7 +820,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
     /**
      * Try creating a child object with a valid (but pruned) parent (from
      * the db). Un-prune the child and try a child save. This simulates
-     * creating a child from a web service client.
+     * creating a child from a web service client. Clients won't typically
+     * set the pruning state when they create an entity, so we won't either.
      * @throws Exception if anything goes badly.
      */
     @Test
@@ -736,6 +829,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // This test spans transactions, so set rollback to false.
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -747,6 +841,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         });
         // prune and add the child outside a transaction.  Then un-prune.
         pruner.prune(parent); // simulate giving to client
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         child = new TestSetChildEntity();
         child.setParent(parent);
         child.setCode("TESTINS");
@@ -754,11 +850,16 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         child.setCreateUser(USER);
         child.setUpdateUser(USER);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(child);
             };
         });
+        // With no state specified, the default should be UNPRUNED_PARTIAL
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_PARTIAL, child.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 child = childDao.save(child);
                 assertNotNull("Child should now have an ID", child.getId());
@@ -777,7 +878,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
     /**
      * Try creating a new child pointing to a new parent and un-prune the 
      * child.  We expect the save to fail because Hibernate wants the parent
-     * to be saved first, but the un-prune should work. 
+     * to be saved first, but the un-prune should work. Clients won't typically
+     * set the pruning state when they create an entity, so we won't either.
      * @throws Exception if anything goes badly.
      */
     @Test
@@ -790,11 +892,16 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         child.setCreateUser(USER);
         child.setUpdateUser(USER);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(child);
             };
         });
+        // With no state specified, the default should be UNPRUNED_PARTIAL
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_PARTIAL, child.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -813,6 +920,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // We need to span transactions
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -825,6 +933,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         });
         // prune and add child outside transaction.
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         child = new TestSetChildEntity();
         child.setParent(parent);
         child.setCode("TESTINS");
@@ -833,13 +943,17 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         child.setUpdateUser(USER);
         parent.getChildren().add(child);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
 
         // Save in new transaction.
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 parent = parentDao.save(parent);
                 assertEquals("Shouldn't have changed parent table", 
@@ -866,6 +980,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // We need to span transactions
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -879,6 +994,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         
         // prune and add child outside transaction.
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         child = new TestSetChildEntity();
         child.setCode("TESTINS");
         child.setDescription("Inserted by addChildNotPointingToParent");
@@ -886,11 +1003,15 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         child.setUpdateUser(USER);
         parent.getChildren().add(child);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 parent = parentDao.save(parent);
                 assertEquals("Shouldn't have changed parent table", 
@@ -915,6 +1036,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // We need to span transactions
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -928,6 +1050,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
 
         // prune, change entity, unprune outside transaction.
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         TestSetUniChildEntity uniChild = new TestSetUniChildEntity();
         uniChild.setParentId(parent.getId());
         uniChild.setCode("TESTINS");
@@ -936,13 +1060,17 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         uniChild.setUpdateUser(USER);
         parent.getUniChildren().add(uniChild);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
 
         // save in new transaction
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 parent = parentDao.save(parent);
                 assertEquals("Shouldn't have changed parent table", 
@@ -973,6 +1101,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // we need to span transactions
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -981,6 +1110,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
             }
         });
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state",
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         TestSetUniChildEntity uniChild = new TestSetUniChildEntity();
         uniChild.setCode("TESTINS");
         uniChild.setDescription("Inserted by addChildNotPointingToParent");
@@ -988,18 +1119,23 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         uniChild.setUpdateUser(USER);
         parent.getUniChildren().add(uniChild);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state",
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
-                assertEjbThrows(EntityExistsException.class, parentDao, "save", parent);
+                assertEjbThrows(PersistenceException.class, parentDao, "save", parent);
             }
         });
         // Clean up in a new transaction because the exception above kills
         // the transaction.
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData();
             }
@@ -1019,6 +1155,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // we need to span transactions
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -1029,6 +1166,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
             }
         });
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state",
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         assertNull("We should have a null child set in the pruned parent",
                 parent.getChildren());
         child = new TestSetChildEntity();
@@ -1041,11 +1180,15 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         children.add(child);
         parent.setChildren(children);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 parent = parentDao.save(parent);
                 assertEquals("Shouldn't have changed parent table", 
@@ -1072,6 +1215,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // we need to span transactions
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -1083,12 +1227,18 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         });
         // prune and un-prune outside the transaction.
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 parentDao.delete(parent);
                 assertEquals("Failed to delete parent", 
@@ -1117,6 +1267,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // we need to span transactions
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -1124,12 +1275,18 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
             }
         });
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 assertEjbThrows(PersistenceException.class, parentDao, "delete", parent);
             }
@@ -1137,6 +1294,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // Clean up in a new transaction because the exception above kills
         // the transaction.
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData();
             }
@@ -1155,6 +1313,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // We need to span transactions
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -1167,13 +1326,19 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         });
         // prune and un-prune outside transaction.
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         // delete in new transaction.
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 parentDao.delete(parent);
                 assertEquals("Failed to delete parent", 
@@ -1202,6 +1367,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // We need to span transactions
         setDefaultRollback(false);
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -1210,12 +1376,18 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
             }
         });
         pruner.prune(parent);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 pruner.unprune(parent);
             };
         });
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_COMPLETE, parent.getPruningState());
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 assertEjbThrows(PersistenceException.class, parentDao, "delete", parent);
             }
@@ -1223,6 +1395,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         // Clean up in a new transaction because the exception above kills
         // the transaction.
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData();
             }
@@ -1243,6 +1416,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
     @Test
     public void fetchChildrenSingleParent() throws Exception {
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -1254,6 +1428,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
         });
         for ( TestSetChildEntity c : childList ) {
             pruner.prune(c);
+    	    assertEquals("entity is in wrong pruning state", 
+    	    		PruningState.PRUNED_COMPLETE, c.getPruningState());
             parent = c.getParent();
             // we the parent's children are lazy loaded, so we should not get
             // children
@@ -1270,6 +1446,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
     @Test
     public void fetchChildAndPrune() throws Exception {
         runInTransaction(new Transactable() {
+            @Override
             public void run() throws Exception {
                 deleteData(); // in case some other test did a commit.
                 createData();
@@ -1280,21 +1457,24 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
             }
         });
         pruner.prune(child);
+	    assertEquals("entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, child.getPruningState());
         parent = child.getParent();
         // we the parent's children are lazy loaded, so we should not get
         // children
         assertNull("A parent's children should be lazy-loaded, therefore null. Parent NOT pruned",
                 parent.getChildren());
     }
-
+    
     /**
 	 * Test fetching all children, then pruning with no args.  We should keep
-	 * all children.
+	 * all children.  This will also test null include lists.
 	 * @throws Exception if anything goes badly.
 	 */
 	@Test
 	public void fetchAllPruneUnlimited() throws Exception {
 	    runInTransaction(new Transactable() {
+            @Override
 	        public void run() throws Exception {
 	                deleteData(); // in case some other test did a commit.
 	                createData();
@@ -1312,6 +1492,8 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
 	            parent.getChildren());
 	    assertNotNull("pruner should NOT have pruned the uniChild set",
 	            parent.getUniChildren());
+	    assertEquals("Entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
 	}
 
 	/** 
@@ -1322,6 +1504,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
     @Test
     public void fetchAllPruneToDepth() throws Exception {
 	    runInTransaction(new Transactable() {
+            @Override
 	        public void run() throws Exception {
 	                deleteData(); // in case some other test did a commit.
 	                createData();
@@ -1339,16 +1522,20 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
 	            parent.getChildren());
 	    assertNull("pruner should have pruned the uniChild set",
 	            parent.getUniChildren());
+	    assertEquals("Entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
     }
 
 	/** 
-     * Try fetching all children, then pruning to a level of 1. We should 
-     * lose all children.  Tests an exclude list of one.
+     * Try fetching all children, then pruning to a level of 10. We should 
+     * lose all children except for the one we requested.  Tests an include
+     * list of one.
      * @throws Exception if anything goes badly.
      */
     @Test
-    public void fetchAllPruneExcludeChild() throws Exception {
+    public void fetchAllPruneIncludeChild() throws Exception {
 	    runInTransaction(new Transactable() {
+            @Override
 	        public void run() throws Exception {
 	                deleteData(); // in case some other test did a commit.
 	                createData();
@@ -1361,21 +1548,27 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
 	            parent.getChildren());
 	    assertNotNull("Test  should start with a uniChild set",
 	            parent.getUniChildren());
-	    pruner.prune(parent, 10, "children");
+	    options = new HashMap<String, String>();
+	    options.put(Options.INCLUDE, "uniChildren");
+	    options.put(Options.DEPTH, "10");
+	    pruner.prune(parent, options);
 	    assertNull("pruner should have pruned the child set",
 	            parent.getChildren());
 	    assertNotNull("pruner should NOT have pruned the uniChild set",
 	            parent.getUniChildren());
+	    assertEquals("Entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
     }
 
 	/** 
-     * Try fetching all children, then pruning, excluding all children. Tests
-     * the ability to parse the exclude list. 
+     * Try fetching all children, then pruning, including all children. Tests
+     * the ability to parse the include list. 
      * @throws Exception if anything goes badly.
      */
     @Test
-    public void fetchAllPruneExcludeAll() throws Exception {
+    public void fetchAllPruneIncludeAll() throws Exception {
 	    runInTransaction(new Transactable() {
+            @Override
 	        public void run() throws Exception {
 	                deleteData(); // in case some other test did a commit.
 	                createData();
@@ -1388,66 +1581,83 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
 	            parent.getChildren());
 	    assertNotNull("Test  should start with a uniChild set",
 	            parent.getUniChildren());
-	    pruner.prune(parent, 10, "children, uniChildren");
-	    assertNull("pruner should have pruned the child set",
-	            parent.getChildren());
-	    assertNull("pruner should have pruned the uniChild set",
-	            parent.getUniChildren());
-    }
-
-	/** 
-     * Try fetching all children, then pruning, excluding one child and an 
-     * invalid attribute. Tests  to make sure an invalid attribute doesn't 
-     * prevent the pruner from pruning the valid ones. 
-     * @throws Exception if anything goes badly.
-     */
-    @Test
-    public void fetchAllPruneExcludeOneWithInvalud() throws Exception {
-	    runInTransaction(new Transactable() {
-	        public void run() throws Exception {
-	                deleteData(); // in case some other test did a commit.
-	                createData();
-	                parent = parentDao.findById(TEST_ID);
-	                parent.getChildren().size();
-	                parent.getUniChildren().size();
-	        };
-	    });
-	    assertNotNull("Test should start with a child set",
-	            parent.getChildren());
-	    assertNotNull("Test  should start with a uniChild set",
-	            parent.getUniChildren());
-	    pruner.prune(parent, 10, "asdf,children ");
-	    assertNull("pruner should have pruned the child set",
-	            parent.getChildren());
-	    assertNotNull("pruner should have NOT pruned the uniChild set",
-	            parent.getUniChildren());
-    }
-
-    /**
-	 * Test fetching all children, then pruning with invalid excludes.  We 
-	 * should keep all children.
-	 * @throws Exception if anything goes badly.
-	 */
-	@Test
-	public void fetchAllPruneInvalidExclude() throws Exception {
-	    runInTransaction(new Transactable() {
-	        public void run() throws Exception {
-	                deleteData(); // in case some other test did a commit.
-	                createData();
-	                parent = parentDao.findById(TEST_ID);
-	                parent.getChildren().size();
-	                parent.getUniChildren().size();
-	        };
-	    });
-	    assertNotNull("Test should start with a child set",
-	            parent.getChildren());
-	    assertNotNull("Test  should start with a uniChild set",
-	            parent.getUniChildren());
-	    pruner.prune(parent, 10, "blahblahblah");
+	    options = new HashMap<String, String>();
+	    options.put(Options.INCLUDE, "children, uniChildren");
+	    options.put(Options.DEPTH, "10");
+	    pruner.prune(parent, options);
 	    assertNotNull("pruner should NOT have pruned the child set",
 	            parent.getChildren());
 	    assertNotNull("pruner should NOT have pruned the uniChild set",
 	            parent.getUniChildren());
+	    assertEquals("Entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
+    }
+
+	/** 
+     * Try fetching all children, then pruning, including one child and an 
+     * invalid attribute. Tests  to make sure an invalid attribute doesn't 
+     * prevent the pruner from including the valid ones. 
+     * @throws Exception if anything goes badly.
+     */
+    @Test
+    public void fetchAllPruneIncludeOneWithInvalud() throws Exception {
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a child set",
+	            parent.getChildren());
+	    assertNotNull("Test  should start with a uniChild set",
+	            parent.getUniChildren());
+	    options = new HashMap<String, String>();
+	    options.put(Options.INCLUDE, "asdf,children ");
+	    options.put(Options.DEPTH, "10");
+	    pruner.prune(parent, options);
+	    assertNotNull("pruner should NOT have pruned the child set",
+	            parent.getChildren());
+	    assertNull("pruner should have pruned the uniChild set",
+	            parent.getUniChildren());
+	    assertEquals("Entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
+    }
+
+    /**
+	 * Test fetching all children, then pruning with invalid include.  We 
+	 * should lose all children.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void fetchAllPruneInvalidInclude() throws Exception {
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a child set",
+	            parent.getChildren());
+	    assertNotNull("Test  should start with a uniChild set",
+	            parent.getUniChildren());
+	    options = new HashMap<String, String>();
+	    options.put(Options.INCLUDE, "blahblahblah");
+	    options.put(Options.DEPTH, "10");
+	    pruner.prune(parent, options);
+	    assertNull("pruner should have pruned the child set",
+	            parent.getChildren());
+	    assertNull("pruner should have pruned the uniChild set",
+	            parent.getUniChildren());
+	    assertEquals("Entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
 	}
 
     /**
@@ -1458,6 +1668,7 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
 	@Test
 	public void fetchNonePrune() throws Exception {
 	    runInTransaction(new Transactable() {
+            @Override
 	        public void run() throws Exception {
 	                deleteData(); // in case some other test did a commit.
 	                createData();
@@ -1469,58 +1680,10 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
 	            parent.getChildren());
 	    assertNull("pruner should have pruned the uniChild set",
 	            parent.getUniChildren());
+	    assertEquals("Entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, parent.getPruningState());
 	}
 
-    /**
-	 * Test fetching no children, then pruning, excluding children.  We 
-	 * shouldn't have any collections.
-	 * @throws Exception if anything goes badly.
-	 */
-	@Test
-	public void fetchNonePruneExclude() throws Exception {
-	    runInTransaction(new Transactable() {
-	        public void run() throws Exception {
-	                deleteData(); // in case some other test did a commit.
-	                createData();
-	                parent = parentDao.findById(TEST_ID);
-	        };
-	    });
-	    pruner.prune(parent, 10, "children");
-	    assertNull("pruner should have pruned the child set",
-	            parent.getChildren());
-	    assertNull("pruner should have pruned the uniChild set",
-	            parent.getUniChildren());
-	}
-
-	/**
-	 * Try fetching all children, then excluding a valid, non-child attribute.
-	 * This shouldn't change anything.
-	 * @throws Exception if anything goes badly.
-	 */
-	@Test
-	public void fetchAllPruneNonCollection() throws Exception {
-	    runInTransaction(new Transactable() {
-	        public void run() throws Exception {
-	                deleteData(); // in case some other test did a commit.
-	                createData();
-	                parent = parentDao.findById(TEST_ID);
-	                parent.getChildren().size();
-	                parent.getUniChildren().size();
-	        };
-	    });
-	    assertNotNull("Test should start with a code", parent.getCode());
-	    assertNotNull("Test should start with a child list",
-	            parent.getChildren());
-	    assertNotNull("Test  should start with a uniChild list",
-	            parent.getUniChildren());
-	    pruner.prune(parent, 10, "code");
-	    assertNotNull("Test should start with a code", parent.getCode());
-	    assertNotNull("pruner should NOT have pruned the child list",
-	            parent.getChildren());
-	    assertNotNull("pruner should NOT have pruned the uniChild list",
-	            parent.getUniChildren());
-	}
-	
 	/**
 	 * Try finding a child, then prune the parent.  This should not do 
 	 * do anything.
@@ -1529,6 +1692,148 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
 	@Test
 	public void loadChildPrune() throws Exception {
 	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                child = childDao.findById(TEST_ID);
+	                parent = child.getParent();
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a parent", child.getParent());
+	    assertNotNull("Test should start with parent having children",
+                      parent.getChildren());
+	    assertTrue("Test should start with parent's children", 
+	    		   parent.getChildren().size() > 0);
+	    assertNotNull("Test should start with parent having uniChildren", 
+	    		      parent.getUniChildren());
+	    assertTrue("Test should start with parent having uniChildren", 
+	    		   parent.getUniChildren().size() > 0);
+	    pruner.prune(child, 2);
+	    assertNotNull("Test should not have pruned parent", child.getParent());
+	    assertNull("Test should have pruned parent's children",
+                parent.getChildren());
+	    assertNull("Test should have pruned parent's uniChildren",
+                parent.getUniChildren());
+	    assertEquals("Entity is in wrong pruning state", 
+	    		PruningState.PRUNED_COMPLETE, child.getPruningState());
+	}
+	
+	/**
+	 * Try finding a record, fetching the children, then prune the parent, 
+	 * selecting a couple of attributes from the parent, including a bogus one.
+	 * Expect only the selected attributes plus both children.  This test also
+	 * tests parsing the select string, and ignoring a bogus attribute.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void fetchAllPruneSelect() throws Exception {
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a child set",
+	            parent.getChildren());
+	    assertNotNull("Test should start with a uniChild set",
+	            parent.getUniChildren());
+	    assertNotNull("Test should start with an ID",
+	    		parent.getId());
+	    assertNotNull("Test should start with a version",
+	    		parent.getVersion());
+	    assertNotNull("Test should start with a code",
+	    		parent.getCode());
+	    assertNotNull("Test should start with a description",
+	    		parent.getDescription());
+	    options = new HashMap<String, String>();
+	    options.put(Options.SELECT, "bogus,code,description");
+	    options.put(Options.DEPTH, "10");
+	    pruner.prune(parent, options);
+	    assertNotNull("pruner should NOT have pruned the child set",
+	            parent.getChildren());
+	    assertNotNull("pruner should NOT have pruned the uniChild set",
+	            parent.getUniChildren());
+	    assertNull("pruner should have pruned the ID",
+	    		parent.getId());
+	    assertNull("pruner should have pruned the version",
+	    		parent.getVersion());
+	    assertNotNull("pruner should NOT have pruned the code",
+	    		parent.getCode());
+	    assertNotNull("pruner should NOT have pruned the description",
+	    		parent.getDescription());
+	    assertNotNull("Pruner should NOT have pruned the pruning state",
+	    		parent.getPruningState());
+	    assertEquals("Entity is in wrong state",
+	    		PruningState.PRUNED_PARTIAL, parent.getPruningState());
+	}
+	
+	/**
+	 * Try finding a record, fetching the children, then prune the parent, 
+	 * selecting an attribute from the parent, and including the child
+	 * collection.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void fetchAllPruneSelectInclude() throws Exception {
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    assertNotNull("Test should start with a child set",
+	            parent.getChildren());
+	    assertNotNull("Test should start with a uniChild set",
+	            parent.getUniChildren());
+	    assertNotNull("Test should start with an ID",
+	    		parent.getId());
+	    assertNotNull("Test should start with a version",
+	    		parent.getVersion());
+	    assertNotNull("Test should start with a code",
+	    		parent.getCode());
+	    assertNotNull("Test should start with a description",
+	    		parent.getDescription());
+	    options = new HashMap<String, String>();
+	    options.put(Options.SELECT, "code,description");
+	    options.put(Options.INCLUDE, "children");
+	    pruner.prune(parent, options);
+	    assertNotNull("pruner should NOT have pruned the child set",
+	            parent.getChildren());
+	    assertNull("pruner should have pruned the uniChild set",
+	            parent.getUniChildren());
+	    assertNull("pruner should have pruned the ID",
+	    		parent.getId());
+	    assertNull("pruner should have pruned the version",
+	    		parent.getVersion());
+	    assertNotNull("pruner should NOT have pruned the code",
+	    		parent.getCode());
+	    assertNotNull("pruner should NOT have pruned the description",
+	    		parent.getDescription());
+	    assertNotNull("Pruner should NOT have pruned the pruning state",
+	    		parent.getPruningState());
+	    assertEquals("Entity is in wrong state",
+	    		PruningState.PRUNED_PARTIAL, parent.getPruningState());
+	}
+
+	/**
+	 * Try finding a child, fetching the child, then pruning the parent.  
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void loadChildParentPruneParent() throws Exception {
+	    runInTransaction(new Transactable() {
+            @Override
 	        public void run() throws Exception {
 	                deleteData(); // in case some other test did a commit.
 	                createData();
@@ -1537,8 +1842,85 @@ public class EntityPrunerHibernateJpaSetTest extends AbstractEjb3ContainerTest  
 	                parent.getUniChildren().size();
 	        };
 	    });
-	    assertNotNull("Test should start with a parent");
-	    pruner.prune(child, 10, "parent");
-	    assertNotNull("Test should not have pruned parent");
+	    assertNotNull("Test should start with a parent", child.getParent());
+	    options = new HashMap<String, String>();
+	    options.put(Options.SELECT, "bogus,code,description");
+	    options.put(Options.DEPTH, "10");
+	    pruner.prune(child, options);
+	    assertNull("Test should have pruned parent", child.getParent());
+	    assertEquals("Entity is in wrong pruning state",
+	    		PruningState.PRUNED_PARTIAL, child.getPruningState());
 	}
+
+	/**
+	 * Try unpruning an entity that is in a partial state to make sure we get
+	 * the correct state.  We aren't worried about anything else here because
+	 * the rest of the pruner's functionality is well tested elsewhere.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void unprunePartialState() throws Exception {
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    // Nothing else should matter but the value of the state.
+	    parent.setPruningState(PruningState.PRUNED_PARTIAL);
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	        	pruner.unprune(parent);
+	        };
+	    });
+	    assertEquals("Entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_PARTIAL, parent.getPruningState());
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	        	deleteData();
+	        };
+	    });
+	}	
+
+	/**
+	 * Try unpruning an entity that doesn't have a pruning state.  This can 
+	 * happen when clients send partial entities. (or new ones).  We aren't 
+	 * worried about anything else here because the rest of the pruner's functionality is well tested elsewhere.
+	 * @throws Exception if anything goes badly.
+	 */
+	@Test
+	public void unpruneNullState() throws Exception {
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	                deleteData(); // in case some other test did a commit.
+	                createData();
+	                parent = parentDao.findById(TEST_ID);
+	                parent.getChildren().size();
+	                parent.getUniChildren().size();
+	        };
+	    });
+	    // Nothing else should matter but the value of the state.
+	    parent.setPruningState(null);
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	        	pruner.unprune(parent);
+	        };
+	    });
+	    assertEquals("Entity is in wrong pruning state", 
+	    		PruningState.UNPRUNED_PARTIAL, parent.getPruningState());
+	    runInTransaction(new Transactable() {
+            @Override
+	        public void run() throws Exception {
+	        	deleteData();
+	        };
+	    });
+	}	
 }

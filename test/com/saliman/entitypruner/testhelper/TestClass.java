@@ -3,6 +3,8 @@ package com.saliman.entitypruner.testhelper;
 import java.util.Collection;
 import java.util.Set;
 
+import javax.persistence.Transient;
+
 /**
  * This is a test class that is used to test both the JunitUtil and 
  * ReflectionUtil utility classes.
@@ -13,13 +15,22 @@ public class TestClass extends Parent {
     // These should have both a getter and a setter.
     private int i; // Tests getting a primitive
     private boolean bool; // Tests getting a boolean with an "is" method
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     private Set untypedSet; // Tests getting an untyped set.
     // These should have a getter or a setter, but not both.
     private long noSetter;
     private double noGetter;
     // In addition, we should have an attribute in a parent class, and one
     // in an abstract one.  One of these should be a typed set.
+
+    // This one is used to test getting a field when the field appears
+    // in both a class and a parent.  The annotation should prove that 
+    // we got the one in the child, not the one in the parent. The particular
+    // annotation is not importatnt, but shouild be unique.
+    @SuppressWarnings("unused")
+    @Transient
+    private String multi;
+
     
     //------------------ Methods to test JUnit utility functionality
     /**
@@ -161,16 +172,16 @@ public class TestClass extends Parent {
     /**
      * @return the set
      */
-    @SuppressWarnings("unchecked")
-    public Set getUntypedSet() {
+    @SuppressWarnings("rawtypes")
+	public Set getUntypedSet() {
         return untypedSet;
     }
 
     /**
      * @param untypedSet the set to untypedSet
      */
-    @SuppressWarnings("unchecked")
-    public void setUntypedSet(Set untypedSet) {
+    @SuppressWarnings("rawtypes")
+	public void setUntypedSet(Set untypedSet) {
         this.untypedSet = untypedSet;
     }
 

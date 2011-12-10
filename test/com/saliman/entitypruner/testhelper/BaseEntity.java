@@ -111,7 +111,7 @@ public abstract class BaseEntity implements Serializable, PrunableEntity {
     
     // These next 2 are for the EntityPruner
     @Transient
-    private boolean pruned = false; // transient, so primitive is OK.
+    private String pruningState;
 
     @Transient
     private Map<String, String> fieldIdMap;
@@ -168,16 +168,16 @@ public abstract class BaseEntity implements Serializable, PrunableEntity {
      * @return the pruned flag.
      */
     @Override
-    public boolean isPruned() {
-        return pruned;
+    public String getPruningState() {
+        return pruningState;
     }
 
     /**
      * @param pruned the pruned to set
      */
     @Override
-    public void setPruned(boolean pruned) {
-        this.pruned = pruned;
+    public void setPruningState(String pruningState) {
+        this.pruningState = pruningState;
     }
 
     /**

@@ -1,18 +1,20 @@
 package com.saliman.entitypruner;
 
+import java.util.Map;
+
 import javax.ejb.Local;
 
 /**
  * This interface defines methods to &quot;prunes&quot; entities so they can be
  * serialized or Marshalled for use in Web Service and RMI calls. 
  * <p>
- * Entities must implement the {@link PrunableEntity} interface to be pruned
+ * Entities must implement the {@link Prunable} interface to be pruned
  * with implementations of this class.
  * <p>
  * implementations of this class will most likely be heavily dependent on
  * the internals of of the persistence mechanism used in an application.
  * 
- * @see PrunableEntity
+ * @see Prunable
  *
  * @author Steven C. Saliman
  */
@@ -126,28 +128,40 @@ public interface EntityPruner {
      * the original collections is needed.
      * <p>
      * This version of the <code>prune</code> method can also be used to
-     * specify a maximum depth for the object, or the names of specific 
-     * attributes to prune out.  This is handy in the case where the client 
-     * only needs so many levels of an object, or certain attributes, but more
-     * levels were populated by the server in the course of its actions inside
-     * the transaction.  Note that only a collection constitutes a level, so
-     * if an entity has an instance of another entity, both will be 
-     * pruned and returned.  Services will probably specify "include" 
-     * attributes, but the pruner uses "exclude" lists because an "include" 
-     * sets the expectation that all attributes in the list will be populated,
-     * and the EntityPruner will not go out to the database to fetch missing
-     * values.
+     * specify a maximum depth for the object, and options with specific
+     * attributes or collections to be included in the pruned object.  This is
+     * handy in the case where the client only needs certain parts of an 
+     * object, but more levels and attributes were populated by the server in 
+     * the course of its actions inside the transaction. Note that only a 
+     * collection constitutes a level, so if an entity has an instance of 
+     * another entity, both will be pruned and returned.  The options map is
+     * patterned after Ruby on Rails patterns for fetching data.  At the 
+     * moment, the EntityPruner supports the following options in the options
+     * map:<br>
+     * <code>include</code> a comma separated list of child collections to
+     * include in the results.<br>
+     * <code>select</code> a comma separated list of attributes to include
+     * in the results.  Having the names of a collection in the select option
+     * will have no effect on the results.<br>
+     * <code>depth</code> the maximum number of levels we want in the pruned
+     * entity.  Use 1 for the entity itself, 2 for the entity and its children,
+     * etc.<br>
+     * It is important to remember that pruning is done outside a transaction.
+     * Specifying an include or select will <b>not</b> cause the EntityPruner
+     * to fetch missing data from the database.  If you are specifying 
+     * options, you should probably call 
+     * {@link EntityUtil#populateEntity(com.pinnacol.framework.entity.Persistable, Map)}
+     * to make sure all the desired children are present.
      * <p>
-     * When specifying both a depth and an exclude list, the 
-     * <code>EntityPruner</code> will exclude collections in the list, and 
-     * prune the rest to the given depth.
-     * @param entity the {@link Prunable} to pruned
-     * @param depth the depth to populate to.  1 for just the entity, 2 for
-     *        children, etc.
-     * @param exclude a comma separated list of attributes to exclude.
+     * When specifying both a depth and options, the <code>EntityPruner</code>
+     * will include collections in the options, and then prune them to the 
+     * given depth.
+     * @param entity the {@link PrunableEntity} to pruned
+     * @param options a map of options and values, patterned after the Ruby on
+     *        Rails conventions.
      * @throws IllegalStateException if there is a problem.
      */
-    public void prune(PrunableEntity entity, int depth, String exclude);
+    public void prune(PrunableEntity entity, Map<String, String> options);
 
     /**
      * Un-prune the given entity so it can be saved by an ORM.  Basically this

@@ -4,9 +4,12 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import javax.persistence.Transient;
 
@@ -76,68 +79,147 @@ public class EntityUtil {
      * @throws IllegalStateException if we can't get one of the values.
      */
     public static void copyTransientData(PrunableEntity source, PrunableEntity dest) {
-        List<Field> fields = obtainFields(source.getClass());
+        List<Field> fields = ReflectionUtil.loadBeanFields(source.getClass(), true);
         for ( Field f : fields ) {
             Annotation a = f.getAnnotation(Transient.class);
             if ( a != null ) {
                 try {
                     f.setAccessible(true);
-                    f.set(dest, f.get(source));
+                    setValue(f, dest, getValue(f, source));
                 } catch (IllegalAccessException e) {
                     String msg = null;
                     msg = "Entity " + source + " has an inaccessable " +
-                         "or mismatched transient attribute: " + f.getName();
+                       	 "or mismatched transient attribute: " + f.getName();
                     LOG.warn(msg);
                     throw new IllegalStateException(msg);
-                }
+                } catch (SecurityException e) {
+                    String msg = null;
+                    msg = "Entity " + source + " has an inaccessable " +
+                       	 "or mismatched transient attribute: " + f.getName();
+                    LOG.warn(msg);
+                    throw new IllegalStateException(msg);
+				} catch (IllegalArgumentException e) {
+                    String msg = null;
+                    msg = "Entity " + source + " has an inaccessable " +
+                       	 "or mismatched transient attribute: " + f.getName();
+                    LOG.warn(msg);
+                    throw new IllegalStateException(msg);
+				} catch (InvocationTargetException e) {
+                    String msg = null;
+                    msg = "Entity " + source + " has an inaccessable " +
+                       	 "or mismatched transient attribute: " + f.getName();
+                    LOG.warn(msg);
+                    throw new IllegalStateException(msg);
+				}
             }
         }
     }
     
     /**
-     * Populate the given entity to the given depth.  A depth of 1 indicates
-     * that only the entity itself needs to be populated.  A depth of 2 means
-     * all the entity's children are loaded, 3 causes grandchildren to be 
-     * loaded, etc.
+     * Populate the given entity based on the given options.  Options are 
+     * patterned after Ruby on Rails options when querying things.  This
+     * method is designed to be used with the {@link EntityPruner} to provide
+     * whatever a client needs from an object graph.
+     * <p>
+     * Supported options are:
+     * <code>include</code> a comma separated list of child collections to
+     * populate.  This option does not cascade into children.<br>
+     * <code>select</code> a comma separated list of attributes to populate.
+     * This list only has an effect on attributes that are entities
+     * themselves. This option does not cascade into children.<br>
+     * <code>depth</code> the minimum number of levels we want in the populated
+     * entity.  Use 1 for the entity itself with all it's parents, 2 for the 
+     * entity and its children, etc. If a select option is present, a depth of 0
+     * can be used to avoid loading attributes that aren't wanted.
      * <p>
      * This method also makes sure that any field that is a proxy is 
      * initialized.
      * <p>
      * This method can only be called within a session, or we'll get lazy 
      * loading errors.
-     * @param entity the {@link PrunableEntity} entity to populate
-     * @param depth the depth to populate to.  1 for just the entity, 2 for
-     *        children, etc.
+     * @param entity the {@link Persistable} entity to populate
+     * @param options the map of options that should be used.
      */
-    public static void populateToDepth(PrunableEntity entity, int depth) {
-        if ( entity == null || depth < 1 ) {
+    public static void populateEntity(PrunableEntity entity, Map<String, String> options) {
+        if ( entity == null ) {
             return;
         }
-        // Loop through fields.  Make sure proxies are initialized, and if the
-        // value is a collection, and depth > 1, also fetch children.
-        List<Field> fields = obtainFields(entity.getClass());
+        // Convert the options into sets of unique keys.
+        String []split = {};
+        Set<String> includeSet = null;
+        if ( options != null && options.containsKey(Options.INCLUDE) ) {
+        	includeSet = new HashSet<String>();
+        	split = options.get(Options.INCLUDE).split(",");
+            for ( String i : split ) {
+            	includeSet.add(i.trim());
+            }
+        }
+        
+        Set<String> selectSet = null;
+        if ( options != null && options.containsKey(Options.SELECT) ) {
+        	selectSet = new HashSet<String>();
+        	split = options.get(Options.SELECT).split(",");
+            for ( String i : split ) {
+            	selectSet.add(i.trim());
+            }
+        }
+        // If no depth was given, use a depth of one.
+        int depth = 1;
+        if ( options != null && options.containsKey(Options.DEPTH) ) {
+        	String depthStr = options.get(Options.DEPTH);
+        	try {
+        		depth = Integer.parseInt(depthStr);
+        	} catch(NumberFormatException nfe) {
+        		throw new IllegalArgumentException(depthStr +
+        				" is not a valid depth");
+        	}
+        }
+        
+        // set up the options for recursive calls.  We need to do this with 
+        // a copy of the original options in case the caller wants to doo 
+        // something else with the original options.
+        // At the moment, only the depth is needed.  Includes and selects 
+        // don't cascade.
+        Map<String, String> newOptions = new HashMap<String, String>();
+        if ( options != null ) {
+        	newOptions.put(Options.DEPTH, Integer.toString(depth-1));
+        }
+        
+        // Loop through fields.  Make sure proxies are initialized, and if 
+        // the value is a collection, and we're interested in a collection or
+        // persistable, fetch it from the database.
+        // We're interested if the field is in the include or select list, or
+        // if we don't have a list and the depth is > 1 for collections, > 0 
+        // for persistables.
+        List<Field> fields = ReflectionUtil.loadBeanFields(entity.getClass(), true);
         for ( Field f : fields ) {
             try {
-                if ( PrunableEntity.class.isAssignableFrom(f.getType()) ) {
-                    Object value = getValue(f, entity);
-                    if ( value instanceof HibernateProxy ) {
-                        LazyInitializer initializer = ((HibernateProxy) value).getHibernateLazyInitializer();
-                        initializer.initialize();
-                    }
-                } else if ( depth > 1 && Collection.class.isAssignableFrom(f.getType())) {
-                    f.setAccessible(true);
-                    Collection<?> collection;
-                    collection = (Collection<?>)f.get(entity);
-                    if ( collection != null ) {
-                        for ( Object value : collection ) {
-                            // the iterator causes the children to be loaded. 
-                            // We need the recursive call to de-proxy.
-                            if ( PrunableEntity.class.isAssignableFrom(value.getClass()) ) {
-                                // child needs one less than parent
-                                populateToDepth((PrunableEntity)value, depth-1);
-                            }
-                        }
-                    }
+            	if ( PrunableEntity.class.isAssignableFrom(f.getType())) {
+            		boolean selected = selectSet != null && selectSet.contains(f.getName());
+            		if ( selected || (selectSet == null && depth > 0) ) {
+            			Object value = getValue(f, entity);
+            			if ( value instanceof HibernateProxy ) {
+            				LazyInitializer initializer = ((HibernateProxy) value).getHibernateLazyInitializer();
+            				initializer.initialize();
+            			}
+            		}
+                } else if ( Collection.class.isAssignableFrom(f.getType()) ) {
+                	boolean included = includeSet != null &&  includeSet.contains(f.getName());
+                	if ( included || (includeSet == null && depth > 1) ) {
+                		f.setAccessible(true);
+                		Collection<?> collection;
+                		collection = (Collection<?>)getValue(f, entity);
+                		if ( collection != null ) {
+                			for ( Object value : collection ) {
+                				// the iterator causes the children to be loaded. 
+                				// We need the recursive call to de-proxy.
+                				if ( PrunableEntity.class.isAssignableFrom(value.getClass()) ) {
+                					// child needs one less than parent
+                					populateEntity((PrunableEntity)value, newOptions);
+                				}
+                			}
+                		}
+                	}
                 }
             } catch (IllegalStateException e) {
                 String msg = null;
@@ -173,24 +255,6 @@ public class EntityUtil {
         }
     }
 
-    /**
-     * Helper method that gets all the fields of a class and it's super-classes.
-     * @param clazz The class whose fields we want.
-     * @return a List of fields from the given class and it's parents, up to 
-     *         the Object class.
-     */
-    private static List<Field> obtainFields(Class<?> clazz) {
-        List<Field> fields = new ArrayList<Field>();
-        if ( !clazz.equals(Object.class) ) {
-            fields.addAll(obtainFields(clazz.getSuperclass()));
-        }
-        Field[] arr = clazz.getDeclaredFields();
-        for ( int i=0 ; i < arr.length; i++ ) {
-            fields.add(arr[i]);
-        }
-        return fields;
-    }
-    
     /**
      * Gets the value from the given field.  We can't just use field.get 
      * because Hibernate doesn't always store the value in the field. It seems
@@ -232,5 +296,34 @@ public class EntityUtil {
             value = field.get(entity);
         }
         return value;
+    }
+
+    /**
+     * Sets the value of the given field in the given entity. We can't just 
+     * use field.set because Hibernate doesn't always store the value in the 
+     * field. It seems to store it in some CGLIB field, using proxy methods to
+     * get to it. We, therefore, need to use those same proxies, or we won't 
+     * be setting the correct value.
+     * @param field the field we want to set.
+     * @param entity the entity we want to change
+     * @param value the value to set.
+     * @throws SecurityException 
+     * @throws InvocationTargetException 
+     * @throws IllegalAccessException 
+     * @throws IllegalArgumentException 
+     * @see #getValue(Field, Persistable)
+     */
+    private static void setValue(Field field, PrunableEntity entity, Object value)
+                   throws SecurityException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+        String name = field.getName();
+        name = name.substring(0,1).toUpperCase() + name.substring(1);
+        name = "set" + name;
+        // Try to set the value using the "set" method first.
+        try {
+            Method method = field.getDeclaringClass().getMethod(name, field.getType());
+            method.invoke(entity, new Object[] {value});
+        } catch (NoSuchMethodException e) {
+            field.set(entity, value);
+        }
     }
 }

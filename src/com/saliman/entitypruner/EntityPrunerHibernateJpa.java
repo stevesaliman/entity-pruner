@@ -67,6 +67,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
     /** logger for the class */
     private static final Logger LOG = Logger.getLogger(EntityPruner.class);
     
+//    @PersistenceContext(unitName="default") // FOR DRE
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -115,11 +116,14 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      * @throws IllegalStateException if there is a problem.
      */
     @TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+    @Override
     public void prune(PrunableEntity entity) {
         // If we have an object graph more than 999 levels deep, we've 
         // got much bigger problems than the obvious bug this hard coded
         // level will cause.
-        prune(entity, 999);
+    	Map<String, String> options = new HashMap<String, String>();
+    	options.put(Options.DEPTH, Integer.toString(999));
+    	prune(entity, options);
     }
 
     /**
@@ -164,8 +168,11 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      *        children, etc.
      * @throws IllegalStateException if there is a problem.
      */
+    @Override
     public void prune(PrunableEntity entity, int depth) {
-    	prune(entity, depth, null);
+    	Map<String, String> options = new HashMap<String, String>();
+    	options.put(Options.DEPTH, Integer.toString(depth));
+    	prune(entity, options);
     }
 
     /**
@@ -174,87 +181,123 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      * happens outside a transaction, otherwise the JPA provider will assume
      * that changes made during pruning need to be saved.  This is not a 
      * problem in a Spring based application, because Spring will only create 
-     * the transaction when it is told, but EJB containers, such as GlassFish, 
+     * the transaction when it is told, but EJB containers, such as GlassFish,
      * will create a default transaction when the service endpoint is invoked, 
      * unless the 
-     * <code>TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)<code> 
-     * annotation is present.  This method will suspend any current 
-     * transaction, but it is undefined what would happen if the pruned 
-     * entity is used by callers that are in an active transaction.<br>
+     * <code>TransactionAttribute(TransactionAttributeType.NEVER)<code> 
+     * annotation is present in the endpoint class.<br>
      * In unit tests, the EntityManager.clear method should be called to make
      * sure we are dealing with detached entities.
      * Pruning basically means 3 things:<br>
-     * 1) replacing Hibernate proxy objects with either their non proxy 
-     *    equivalents (if they have been initialized), or <code>null</code> (if 
-     *    they haven't)  This will prevent 
-     *    <code>LazyInitializationException</code> when entities are serialized.<br> 
+     * 1) replacing proxy objects with either their non proxy equivalents (f
+     *    they have been initialized), or <code>null</code> (if they haven't)
+     *    <br>
      * 2) Removal of circular references. This method tries to detect 
      *    bidirectional associations, and when found, the child's parent
      *    reference is set to null to prevent XML serialization problems.
-     *    This method uses the persistence annotations to detect these 
-     *    bidirectional associations, which means that if an entity contains
-     *    a <code>Transient</code> collection of entities that refer back to
-     *    the parent, the circular reference will remain.  It is up to the
-     *    caller to make sure we don't try to prune these kinds of entities.
      * 3) Recursive pruning of parent entities, and each entity in a collection.
      * <p>
-     * Note that this method only de-proxies attributes of the entity, not the
-     * entity itself.  This could lead to unexpected results in the client
-     * if, for some reason, the base entity is a proxy.
+     * Note that once an entity is pruned, it is no longer possible to 
+     * access lazy-loaded collections, even if the entity is un-pruned later.
      * <p>
-     * Once an entity is pruned, it is no longer possible to access 
-     * lazy-loaded collections, even if the entity is un-pruned later.
-     * <p>
-     * Pruning an entity does not save the entity's old collections in any 
-     * way. It is up to the caller to make a copy of the object's collections
-     * before calling <code>prune</code>, if access to the original 
-     * collections is needed.
+     * Also note that pruning an entity does not save the entity's old 
+     * collections in any way. It is up to the caller to make a copy of the
+     * object's collections before calling <code>prune</code>, if access to 
+     * the original collections is needed.
      * <p>
      * This version of the <code>prune</code> method can also be used to
-     * specify a maximum depth for the object, and the names of specific 
-     * attributes to prune out.  This is handy in the case where the client 
-     * only needs so many levels of an object, or certain attributes, but more
-     * levels were populated by the server in the course of its actions inside
-     * the transaction.  Note that only a collection constitutes a level, so
-     * if an entity has an instance of another entity, both will be 
-     * pruned and returned.  Services will probably specify "include" 
-     * attributes, but the pruner uses "exclude" lists because an "include" 
-     * sets the expectation that all attributes in the list will be populated,
-     * and the EntityPruner will not go out to the database to fetch missing
-     * values.
+     * specify a maximum depth for the object, and options with specific
+     * attributes or collections to be included in the pruned object.  This is
+     * handy in the case where the client only needs certain parts of an 
+     * object, but more levels and attributes were populated by the server in 
+     * the course of its actions inside the transaction. Note that only a 
+     * collection constitutes a level, so if an entity has an instance of 
+     * another entity, both will be pruned and returned.  The options map is
+     * patterned after Ruby on Rails patterns for fetching data.  At the 
+     * moment, the EntityPruner supports the following options in the options
+     * map:<br>
+     * <code>include</code> a comma separated list of child collections to
+     * include in the results.  If null, all children will be loaded.<br>
+     * <code>select</code> a comma separated list of attributes to include
+     * in the results.  Having the names of a collection in the select option
+     * will have no effect on the results.  If there are no selects, all
+     * attributes will be loaded.<br>
+     * <code>depth</code> the maximum number of levels we want in the pruned
+     * entity.  Use 1 for the entity itself, 2 for the entity and its children,
+     * etc.  This attribute is secondary to the include or select attributes.
+     * The default is 1.<br>
+     * It is important to remember that pruning is done outside a transaction.
+     * Specifying an include or select will <b>not</b> cause the EntityPruner
+     * to fetch missing data from the database.  If you are specifying 
+     * options, you should probably call 
+     * {@link EntityUtil#populateEntity(Persistable, Map)}
+     * to make sure all the desired children are present.
      * <p>
-     * When specifying both a depth and an exclude list, the 
-     * <code>EntityPruner</code> will exclude collections in the list, and 
-     * prune the rest to the given depth.
+     * When specifying both a depth and options, the <code>EntityPruner</code>
+     * will include collections in the options, and then prune them to the 
+     * given depth.
      * @param entity the {@link PrunableEntity} to pruned
-     * @param depth the depth to populate to.  1 for just the entity, 2 for
-     *        children, etc.
-     * @param exclude a comma separated list of attributes to exclude.
+     * @param options a map of options and values, patterned after the Ruby on
+     *        Rails conventions.
      * @throws IllegalStateException if there is a problem.
      */
     @TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
-    public void prune(PrunableEntity entity, int depth, String exclude) {
+    @Override
+    public void prune(PrunableEntity entity, Map<String, String> options) {
         // toString may be expensive...
-        LOG.trace("prune(Prunable, int, String)");
-
-        // Convert the exclude list into a set of unique keys.
-        String []split = {};
-        Set<String> excludeSet = new HashSet<String>();
-        if ( exclude != null ) {
-        	split = exclude.split(",");
-        }
-        for ( String i : split ) {
-        	excludeSet.add(i.trim());
-        }
+        LOG.trace("prune(PrunableEntity, int, String)");
 
         // First things first.  See if we've already started this one
-        if ( entity == null || entity.isPruned() ) {
+        if ( entity == null ) {
+        	return;
+        }
+        // If we don't have a state when we start pruning, assume that we 
+        // created a new entity on the server and didn't specify a value.
+        // Assume unpruned and complete.
+        if ( entity.getPruningState() == null ) {
+        	entity.setPruningState(PruningState.UNPRUNED_COMPLETE);
+        }
+        if ( entity.getPruningState().equals(PruningState.PRUNED_COMPLETE) ||
+        		entity.getPruningState().equals(PruningState.PRUNED_PARTIAL) ) {
             return;
         }
+
+        // Convert the options into sets of unique keys.
+        String []split = {};
+        Set<String> includeSet = null;
+        if ( options != null && options.containsKey(Options.INCLUDE) ) {
+        	includeSet = new HashSet<String>();
+        	split = options.get(Options.INCLUDE).split(",");
+            for ( String i : split ) {
+            	includeSet.add(i.trim());
+            }
+        }
+        
+        Set<String> selectSet = null;
+        if ( options != null && options.containsKey(Options.SELECT) ) {
+        	selectSet = new HashSet<String>();
+        	split = options.get(Options.SELECT).split(",");
+            for ( String i : split ) {
+            	selectSet.add(i.trim());
+            }
+        }
+        // If no depth was given, use a large number.
+        int depth = 999;
+        if ( options != null && options.containsKey(Options.DEPTH) ) {
+        	String depthStr = options.get(Options.DEPTH);
+        	try {
+        		depth = Integer.parseInt(depthStr);
+        	} catch(NumberFormatException nfe) {
+        		throw new IllegalArgumentException(depthStr +
+        				" is not a valid depth");
+        	}
+        }
+
         // When we prune children, they may cause recursive calls to prune.
         // Mark this as pruned so those recursive calls don't attempt to do it
-        // again.
-        entity.setPruned(true);
+        // again.  At this point, assume we're producing a complete entity 
+        // until we discover otherwise.
+        entity.setPruningState(PruningState.PRUNED_COMPLETE);
         
         // We can't use the entity's toString() because some entities use 
         // parent objects in their toString() methods, which could be 
@@ -268,26 +311,38 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
                 field.setAccessible(true);
                 Object value = getValue(field, entity);
                 if ( value != null ) {
-                    if ( field.getName().equals("pruned") ) {
-                        // we're always pruned, this is a no-op
-                        entity.setPruned(true);
-                    } else if ( PrunableEntity.class.isAssignableFrom(value.getClass()) ) {
-                        // If this is another Prunable entity, de-proxy it, 
-                        // then set the field's value to the de-proxied
-                        // value and prune it.
-                        value = deproxy(entity, value, field.getName(), field.getType());
-                        field.set(entity, value);
-                        prune((PrunableEntity)value, depth-1);
+                    if ( PrunableEntity.class.isAssignableFrom(value.getClass()) ) {
+                        // If this is another PrunableEntity entity, and we want to
+                    	// include it, then de-proxy it, and set the field's 
+                    	// value to the de-proxied value and prune it.
+                    	if ( selectSet != null &&
+                    			!selectSet.contains(field.getName()) ) {
+                    		field.set(entity, null);
+                    		entity.setPruningState(PruningState.PRUNED_PARTIAL);
+                    	} else {
+                    		value = deproxy(entity, value, field.getName(), field.getType());
+                    		field.set(entity, value);
+                    		prune((PrunableEntity)value, depth-1);
+                    	}
                     } else if ( Collection.class.isAssignableFrom(field.getType()) ) {
                         // Handle Collections. We already know it's not null,
                         // but we need to replace proxy collections with
                         // non proxy collections, or possibly prune out
                         // the collection.
-                        pruneCollection(entity, depth, excludeSet, (Collection<?>)value, field);
+                        pruneCollection(entity, depth, includeSet, (Collection<?>)value, field);
+                    } else {
+                    	// This isn't a PrunableEntity, or a collection, If we have
+                    	// a "select" list, and it doesn't contain the current
+                    	// attribute, prune it out and set the entity to a
+                    	// partial state.  We can only do this if we're not
+                    	// primitive - primitives can't be null.
+                    	if ( selectSet != null && 
+                    			!selectSet.contains(field.getName()) &&
+                    			!isPrimitive(field) ) {
+                    		field.set(entity, null);
+                    		entity.setPruningState(PruningState.PRUNED_PARTIAL);
+                    	}
                     }
-                    // the implied else from above is that the value is an 
-                    // object that doesn't need pruning, which could be
-                    // other entities if they don't implement Prunable
                 }
             }
         } catch (IllegalAccessException e) {
@@ -327,10 +382,21 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      * @throws IllegalStateException if something goes wrong
      */
     @TransactionAttribute(TransactionAttributeType.REQUIRED)
+    @Override
     public void unprune(PrunableEntity entity) {
-        LOG.trace("unprune(Prunable)");
-        // bail if we're already un-pruned.  This avoids loops.
-        if ( entity == null || !entity.isPruned() ) {
+        LOG.trace("unprune(PrunableEntity)");
+        // bail if we're already un-pruned.  This avoids loops. The unpruner
+        // assumes that if the pruning state is missing, a client is giving
+        // us a partial object, since complete objects should have had a state.
+        // Assume a partially pruned state.
+        if ( entity == null ) {
+        	return;
+        }
+        if ( entity.getPruningState() == null ) {
+        	entity.setPruningState(PruningState.PRUNED_PARTIAL);
+        }
+        if ( entity.getPruningState().equals(PruningState.UNPRUNED_COMPLETE) ||
+        		entity.getPruningState().equals(PruningState.UNPRUNED_PARTIAL) ) {
             return;
         }
         
@@ -348,7 +414,12 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
             LOG.warn("Can't refresh: " + delegate.getClass() +  " Is not a Session object");
         }
 
-        entity.setPruned(false);
+        // First matk set the appropriate state to avoid loops.
+        if ( entity.getPruningState().equals(PruningState.PRUNED_COMPLETE) ) {
+        	entity.setPruningState(PruningState.UNPRUNED_COMPLETE);
+        } else {
+        	entity.setPruningState(PruningState.UNPRUNED_PARTIAL);
+        }
         // We can't use the entity's toString() because some entities use 
         // parent objects in their toString() methods, which could be 
         // uninitialized proxies, which means we can't put the entity in the
@@ -360,11 +431,8 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
             for ( Field field : fields ) {
                 field.setAccessible(true);
                 Object value = getValue(field, entity);
-                if ( field.getName().equals("pruned") ) {
-                    // always set to be un-pruned
-                    entity.setPruned(false);
-                } else if ( PrunableEntity.class.isAssignableFrom(field.getType()) ) {
-                    // If this is another Prunable entity, restore the proxy
+                if ( PrunableEntity.class.isAssignableFrom(field.getType()) ) {
+                    // If this is another PrunableEntity entity, restore the proxy
                     // class.  The helper method de-prunes it if necessary.
                     reproxy(entity, (PrunableEntity)value, field, session);
                 } else if ( Collection.class.isAssignableFrom(field.getType()) ) {
@@ -422,10 +490,10 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      * @throws IllegalArgumentException 
      * @throws SecurityException 
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private void pruneCollection(PrunableEntity entity, 
                                         int depth,
-                                        Set<String> excludeSet,
+                                        Set<String> includeSet,
                                         Collection<?> collection,
                                         Field field) 
                  throws IllegalAccessException, IllegalStateException,
@@ -434,7 +502,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
         
         // We only need to deal with the collection if we want a depth > 1.
         // Otherwise, we don't want any children.
-        if ( depth > 1 && !excludeSet.contains(field.getName()) ) {
+        if ( depth > 1 && (includeSet == null || includeSet.contains(field.getName())) ) {
             if ( PersistentCollection.class.isAssignableFrom(collection.getClass()) ) {
                 if ( !((PersistentCollection)collection).wasInitialized() ) {
                     // non-initialized, so prune with a null.
@@ -465,7 +533,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
             Field childsParent = null;
             boolean looked = false;
             for ( Object child : collection ) {
-                // prune each child if the child is Prunable
+                // prune each child if the child is Persistable
                 if ( PrunableEntity.class.isAssignableFrom(child.getClass()) ) {
                     // See if the child pointed to the parent.
                     // we only need to do this once...
@@ -484,7 +552,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
                 }
             }
         }
-        setValue(field,entity, newValue);
+        setValue(field, entity, newValue);
     }
     
     /**
@@ -622,6 +690,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
                             break;
                         }
                     }
+                    currClazz = currClazz.getSuperclass();
                 }
                 if ( childsParent == null ) {
                     msg = "Entity " + entity + " has a child collecion " +
@@ -630,6 +699,18 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
                     LOG.warn(msg);
                     throw new NullPointerException(msg);
                 }
+
+                // The parent entity may still be proxied, which has been 
+                // observed to cause errors, so let's fix that here.
+                // Since we do call by value in Java, there's no worries
+                // about changing the entity's value here.
+                if ( entity instanceof HibernateProxy ) {
+                    LazyInitializer initializer = ((HibernateProxy) entity).getHibernateLazyInitializer();
+                    if ( !initializer.isUninitialized() ) {
+                        entity = (PrunableEntity)initializer.getImplementation();
+                    } 
+                }
+
                 if ( !entity.getClass().isAssignableFrom(childsParent.getType()) ) {
                     msg = "Entity " + entity + " has a child collecion " +
                           "marked as bidrectional, but the child's parent " +
@@ -881,5 +962,34 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
     		}
     	}
     	return newId;
+    }
+    
+    /**
+     * Helper method to determine if the given field holds a primitive value.
+     * @param field The field in question
+     * @return <code>true</code> if the field represents one of Java's 
+     * primitive values.
+     */
+    private boolean isPrimitive(Field field) {
+    	boolean primitive = false;
+    	Class<?> clazz = field.getType();
+    	if ( boolean.class.isAssignableFrom(clazz) ) {
+    		primitive = true;
+        } else if ( byte.class.isAssignableFrom(clazz) ) {
+    		primitive = true;
+        } else if ( char.class.isAssignableFrom(clazz) ) {
+    		primitive = true;
+        } else if ( short.class.isAssignableFrom(clazz) ) {
+    		primitive = true;
+        } else if ( int.class.isAssignableFrom(clazz) ) {
+    		primitive = true;
+        } else if ( long.class.isAssignableFrom(clazz) ) {
+    		primitive = true;
+        } else if ( float.class.isAssignableFrom(clazz) ) {
+    		primitive = true;
+        } else if ( double.class.isAssignableFrom(clazz) ) {
+    		primitive = true;
+        }
+    	return primitive;
     }
 }
