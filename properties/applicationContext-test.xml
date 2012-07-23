@@ -73,7 +73,7 @@
     <!-- Configurer that replaces ${...} placeholders with values from 
          properties files. The framework version decrypts values that start
          with "{aes}" -->
-		<context:component-scan base-package="com.saliman.entitypruner"/>
+		<context:component-scan base-package="net.saliman.entitypruner"/>
 		<tx:annotation-driven />
 
 	<!--==================== DATABASE SECTION ============================ -->
@@ -197,71 +197,71 @@
 
 	<!-- Oracle List Daos -->
 	<bean id="TestListParentDaoOracle"
-	      class="com.saliman.entitypruner.testhelper.list.TestListParentDaoJpaOracle"
+	      class="net.saliman.entitypruner.testhelper.list.TestListParentDaoJpaOracle"
 	      scope="singleton">
 	</bean>
 
 	<bean id="TestListChildDaoOracle"
-	      class="com.saliman.entitypruner.testhelper.list.TestListChildDaoJpaOracle"
+	      class="net.saliman.entitypruner.testhelper.list.TestListChildDaoJpaOracle"
 	      scope="singleton">
 	</bean>
 
 	<bean id="TestListUniChildDaoOracle"
-	      class="com.saliman.entitypruner.testhelper.list.TestListUniChildDaoJpaOracle"
+	      class="net.saliman.entitypruner.testhelper.list.TestListUniChildDaoJpaOracle"
 	      scope="singleton">
 	</bean>
 
 	<!-- Oracle Set Daos -->
 	<bean id="TestSetParentDaoOracle"
-	      class="com.saliman.entitypruner.testhelper.set.TestSetParentDaoJpaOracle"
+	      class="net.saliman.entitypruner.testhelper.set.TestSetParentDaoJpaOracle"
 	      scope="singleton">
 	</bean>
 
 	<bean id="TestSetChildDaoOracle"
-	      class="com.saliman.entitypruner.testhelper.set.TestSetChildDaoJpaOracle"
+	      class="net.saliman.entitypruner.testhelper.set.TestSetChildDaoJpaOracle"
 	      scope="singleton">
 	</bean>
 
 	<bean id="TestSetUniChildDaoOracle"
-	      class="com.saliman.entitypruner.testhelper.set.TestSetUniChildDaoJpaOracle"
+	      class="net.saliman.entitypruner.testhelper.set.TestSetUniChildDaoJpaOracle"
 	      scope="singleton">
 	</bean>
 
 	<!-- MySql List Daos -->
 	<bean id="TestListParentDaoMysql"
-	      class="com.saliman.entitypruner.testhelper.list.TestListParentDaoJpaMysql"
+	      class="net.saliman.entitypruner.testhelper.list.TestListParentDaoJpaMysql"
 	      scope="singleton">
 	</bean>
 
 	<bean id="TestListChildDaoMysql"
-	      class="com.saliman.entitypruner.testhelper.list.TestListChildDaoJpaMysql"
+	      class="net.saliman.entitypruner.testhelper.list.TestListChildDaoJpaMysql"
 	      scope="singleton">
 	</bean>
 
 	<bean id="TestListUniChildDaoMysql"
-	      class="com.saliman.entitypruner.testhelper.list.TestListUniChildDaoJpaMysql"
+	      class="net.saliman.entitypruner.testhelper.list.TestListUniChildDaoJpaMysql"
 	      scope="singleton">
 	</bean>
 
 	<!-- MySql Set Daos -->
 	<bean id="TestSetParentDaoMysql"
-	      class="com.saliman.entitypruner.testhelper.set.TestSetParentDaoJpaMysql"
+	      class="net.saliman.entitypruner.testhelper.set.TestSetParentDaoJpaMysql"
 	      scope="singleton">
 	</bean>
 
 	<bean id="TestSetChildDaoMysql"
-	      class="com.saliman.entitypruner.testhelper.set.TestSetChildDaoJpaMysql"
+	      class="net.saliman.entitypruner.testhelper.set.TestSetChildDaoJpaMysql"
 	      scope="singleton">
 	</bean>
 
 	<bean id="TestSetUniChildDaoMysql"
-	      class="com.saliman.entitypruner.testhelper.set.TestSetUniChildDaoJpaMysql"
+	      class="net.saliman.entitypruner.testhelper.set.TestSetUniChildDaoJpaMysql"
 	      scope="singleton">
 	</bean>
 
 	<!-- The EntityPuner -->
     <bean id="EntityPruner"
-          class="com.saliman.entitypruner.EntityPrunerHibernateJpa"
+          class="net.saliman.entitypruner.EntityPrunerHibernateJpa"
           scope="singleton">
     </bean>
 </beans>

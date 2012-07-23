@@ -11,14 +11,14 @@
     <persistence-unit name="default" transaction-type="JTA">
         <provider>org.hibernate.ejb.HibernatePersistence</provider>
 				<jta-data-source>@oracle.data.source@</jta-data-source>
-        <class>com.saliman.entitypruner.testhelper.BaseEntity</class>
-        <class>com.saliman.entitypruner.testhelper.AuditableEntity</class>
-        <class>com.saliman.entitypruner.testhelper.list.TestListParentEntity</class>
-        <class>com.saliman.entitypruner.testhelper.list.TestListChildEntity</class>
-        <class>com.saliman.entitypruner.testhelper.list.TestListUniChildEntity</class>
-        <class>com.saliman.entitypruner.testhelper.set.TestSetParentEntity</class>
-        <class>com.saliman.entitypruner.testhelper.set.TestSetChildEntity</class>
-        <class>com.saliman.entitypruner.testhelper.set.TestSetUniChildEntity</class>
+        <class>net.saliman.entitypruner.testhelper.BaseEntity</class>
+        <class>net.saliman.entitypruner.testhelper.AuditableEntity</class>
+        <class>net.saliman.entitypruner.testhelper.list.TestListParentEntity</class>
+        <class>net.saliman.entitypruner.testhelper.list.TestListChildEntity</class>
+        <class>net.saliman.entitypruner.testhelper.list.TestListUniChildEntity</class>
+        <class>net.saliman.entitypruner.testhelper.set.TestSetParentEntity</class>
+        <class>net.saliman.entitypruner.testhelper.set.TestSetChildEntity</class>
+        <class>net.saliman.entitypruner.testhelper.set.TestSetUniChildEntity</class>
 
         <properties>
             <property name="hibernate.dialect" 
@@ -38,14 +38,14 @@
     <persistence-unit name="mysql" transaction-type="JTA">
         <provider>org.hibernate.ejb.HibernatePersistence</provider>
 				<jta-data-source>@mysql.data.source@</jta-data-source>
-        <class>com.saliman.entitypruner.testhelper.BaseEntity</class>
-        <class>com.saliman.entitypruner.testhelper.AuditableEntity</class>
-        <class>com.saliman.entitypruner.testhelper.list.TestListParentEntity</class>
-        <class>com.saliman.entitypruner.testhelper.list.TestListChildEntity</class>
-        <class>com.saliman.entitypruner.testhelper.list.TestListUniChildEntity</class>
-        <class>com.saliman.entitypruner.testhelper.set.TestSetParentEntity</class>
-        <class>com.saliman.entitypruner.testhelper.set.TestSetChildEntity</class>
-        <class>com.saliman.entitypruner.testhelper.set.TestSetUniChildEntity</class>
+        <class>net.saliman.entitypruner.testhelper.BaseEntity</class>
+        <class>net.saliman.entitypruner.testhelper.AuditableEntity</class>
+        <class>net.saliman.entitypruner.testhelper.list.TestListParentEntity</class>
+        <class>net.saliman.entitypruner.testhelper.list.TestListChildEntity</class>
+        <class>net.saliman.entitypruner.testhelper.list.TestListUniChildEntity</class>
+        <class>net.saliman.entitypruner.testhelper.set.TestSetParentEntity</class>
+        <class>net.saliman.entitypruner.testhelper.set.TestSetChildEntity</class>
+        <class>net.saliman.entitypruner.testhelper.set.TestSetUniChildEntity</class>
 
         <properties>
             <property name="hibernate.dialect" 

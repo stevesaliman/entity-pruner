@@ -36,7 +36,7 @@
     <property name="entity-pruner.jar"       value="${deploy.name}-${application.version}.jar"/>
     <property name="project.name"        value="Entity Pruner"/>
     <property name="project.vendor"      value="Steven C. Saliman"/>
-    <property name="project.package"     value="com.saliman.entitypruner"/>
+    <property name="project.package"     value="net.saliman.entitypruner"/>
     <!-- if logging level wasn't in the properties file, use WARN-->
     <property name="default.logging.level" value="WARN"/>
     <!-- if hibernate.show.sql wasn't in the properties file, use false -->

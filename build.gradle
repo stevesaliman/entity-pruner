@@ -19,7 +19,7 @@ apply plugin: "properties"
 
 sourceCompatibility = 1.6
 targetCompatibility = 1.6
-version = "1.0.2"
+version = "3.1.0-SNAPSHOT"
 group = "net.saliman"
 archivesBaseName = "entity-pruner"
 ext.isSnapshot = version.endsWith("SNAPSHOT")
@@ -76,19 +76,20 @@ if ( !project.hasProperty('testPortBase') ) {
 	project.ext.testPortBase = "9000"
 }
 
-defaultTasks 'clean', 'test', 'dist'
+defaultTasks 'clean', 'test', 'install'
 
 // devel adds the devel artifact, the provided lets us set up dependencies 
 // that won't be in the poms
 configurations {
 	provided
-	providedTest
 	archives
 }
 
-artifacts {
-  archives jar
+repositories {
+    mavenCentral()
+	mavenLocal()
 }
+
 
 sourceSets {
 	// we need the test resources to be put in the same directory as the test
@@ -99,10 +100,8 @@ sourceSets {
 	}
 	test {
 		test.output.resourcesDir = compileTestJava.destinationDir
-		compileClasspath = compileClasspath + configurations.provided +
-						   configurations.providedTest
-		runtimeClasspath = runtimeClasspath + configurations.provided +
-		                   configurations.providedTest
+		compileClasspath = compileClasspath + configurations.provided
+		runtimeClasspath = runtimeClasspath + configurations.provided
 	}
 }
 
@@ -124,8 +123,6 @@ dependencies {
     provided "org.hibernate:hibernate-entitymanager:${hibernateVersion}"
     provided "net.sf.ehcache:ehcache-core:2.5.0"
 
-	
-
     provided "commons-io:commons-io:1.3.2"
 
 	// EJB dependencies.  Clients will need this if they want to deploy the
@@ -136,14 +133,14 @@ dependencies {
     provided "org.glassfish.extras:glassfish-embedded-all:3.1.1"
 
     // Needed to run tests
-    providedTest "junit:junit:4.10"
-    providedTest "org.apache.tomcat:tomcat-dbcp:7.0.26"
-    providedTest "com.oracle:ojdbc6:10.2.0.4.0"
-    providedTest "mysql:mysql-connector-java:5.1.18"
-    providedTest "com.atomikos:transactions:${atomikosVersion}"
-    providedTest "com.atomikos:transactions-jdbc:${atomikosVersion}"
-    providedTest "com.atomikos:transactions-hibernate3:${atomikosVersion}"
-    providedTest "com.google.guava:guava:10.0.1"
+    testCompile "junit:junit:4.10"
+    testCompile "org.apache.tomcat:tomcat-dbcp:7.0.26"
+    testCompile "com.oracle:ojdbc6:10.2.0.4.0"
+    testCompile "mysql:mysql-connector-java:5.1.18"
+    testCompile "com.atomikos:transactions:${atomikosVersion}"
+    testCompile "com.atomikos:transactions-jdbc:${atomikosVersion}"
+    testCompile "com.atomikos:transactions-hibernate3:${atomikosVersion}"
+    testCompile "com.google.guava:guava:10.0.1"
 
 	//testRuntime
 
@@ -298,84 +295,103 @@ jar {
 	}
 }
 
-
-
-task dist(dependsOn: jar) {
-	description = "create the distribution"
-	doFirst {
-		// copy jars, make javadoc, etc.
-		println "dist"
-		println "project=${project.name}"
-		println "project=${project.name}"
-	}
+task sourceJar(type: Jar) {
+	description = "An archive of the source code for Maven Central"
+	classifier = "sources"
+	from sourceSets.main.java
 }
 
-
-// Define the standard repositories
-repositories {
-    mavenCentral()
-	mavenLocal()
+task javadocJar(type: Jar, dependsOn: "javadoc") {
+	description = "An archive of the javadocs for Maven Central"
+	classifier = "javadoc"
+	from javadoc
 }
 
 install {
-    repositories {
-	    mavenInstaller {
-			addFilter('main') { artifact, file ->
-				println "main: ${artifact.name}"
-			    artifact.name == 'entity-pruner'
-			}
-			addFilter('devel') { artifact, file ->
-				println "devel: ${artifact.name}"
-			    artifact.name == 'entity-pruner-devel'
-			}
-			pom('main').groupId = 'com.saliman'
-			pom('main').artifactId = 'entity-pruner'
-			pom('main').version = '3.1.2'
-			pom('devel').groupId = 'com.saliman'
-			pom('devel').artifactId = 'entity-pruner-devel'
-			pom('devel').version = '3.1.2'
-		}
+    //repositories {
+	    //mavenInstaller {
+			//pom('main').groupId = 'net.saliman'
+			//pom('main').artifactId = 'entity-pruner'
+			//pom('main').version = '3.1.0'
+		//}
+	//}
+	doLast {
+		// copy things to the dist dir.
 	}
+}
+
+artifacts {
+  archives jar, javadocJar, sourceJar
+}
+
+signing {
+	sign configurations.archives
+}
+
+// Only *require* signing if we are uploading a non snapshot version.  If we
+// do need to sign, make sure we've got the properties we need to do the 
+// signing.
+import org.gradle.plugins.signing.Sign
+gradle.taskGraph.whenReady { taskGraph ->
+    tasks.withType(org.gradle.plugins.signing.Sign).all {
+        required = taskGraph.hasTask(":uploadArchives") && !isSnapshot
+        if ( required ) {
+            // Use Java 6's console to read from the console (no good for a CI 
+            // environment)
+            Console console = System.console()
+            console.printf "\n\nWe have to sign some things in this build...\n\n"
+
+            if ( !project.hasProperty('signing.keyId') ) {
+                def id = console.readLine("PGP Key Id: ")
+                allprojects { ext."signing.keyId" = id }
+            }
+
+            if ( !project.hasProperty('signing.secretKeyRingFile') ) {
+                ef file = console.readLine("PGP Secret Key Ring File (absolute path): ")
+                allprojects { ext."signing.secretKeyRingFile" = file }
+            }
+
+            if ( !project.hasProperty('signing.password') ) {
+                def password = console.readPassword("PGP Private Key Password: ")
+                allprojects { ext."signing.password" = password }
+            }
+
+            //def x = ext."signing.keyId"
+            //println "using key ${x}"
+
+            console.printf "\nThanks.\n\n"
+        }
+    }
 }
 
 uploadArchives {
     repositories {
 	    mavenDeployer {
-			configuration = configurations.archives
-		    repository(url: mavenRepoUploadUrl) {
-			    authentication(userName: "git")
-			}
-			addFilter('main') { artifact, file ->
-				println "main: ${artifact.name}"
-			    artifact.name == 'entity-pruner'
-			}
-			addFilter('devel') { artifact, file ->
-				println "devel: ${artifact.name}"
-			    artifact.name == 'entity-pruner-devel'
-			}
-			pom('main').groupId = 'com.saliman'
-			pom('main').artifactId = 'entity-pruner'
-			pom('main').version = '3.1.2'
-			pom('devel').groupId = 'com.saliman'
-			pom('devel').artifactId = 'entity-pruner-devel'
-			pom('devel').version = '3.1.2'
+            if (signing.signatory) {
+                beforeDeployment { signPom(it) }
+            }
+            configuration = configurations.archives
+            //repository(url: "file://$buildDir/m2repo")
+            repository(url: mavenRepoUploadUrl) {
+                authentication(userName: mavenRepoUsername,
+                               password: mavenRepoPassword)
+                releases(updatePolicy: "always")
+                snapshots(updatePolicy: "always")
+            }
+            pom.project(pomConfiguration)
 		}
 	}
-	doFirst {
-	    configurations.each { c ->
-		    println "Configuration: ${c.name}"
-			c.artifacts.each { a ->
-			    println "  artifact: ${a.name}"
-			}
-		}
-	}
+}
+
+// The Gradle wrapper
+task wrapper(type: Wrapper) {
+	gradleVersion = '1.0'
 }
 
 // Idea needs to see all the extra dependencies from our custom configs.
 idea {
 	module {
 		scopes.COMPILE.plus += configurations.provided
-		scopes.TEST.plus += configurations.providedTest
 	}
 }
 
@@ -389,5 +405,42 @@ idea.project.ipr.withXml { provider ->
     // set gradle home
     def gradleSettings = node.appendNode('component',[name: 'GradleSettings'])
     gradleSettings.appendNode('option', [name: 'SDK_HOME', value: gradle.gradleHomeDir.absolutePath])
+}
+
+// if we're signing anything, we'll need the GPG password
+gradle.taskGraph.whenReady { taskGraph ->
+    if (taskGraph.allTasks.any { it instanceof Sign }) {
+    }
+}
+
+/**
+ * Create POM config and return for use by other tasks.
+ */
+def getPomConfiguration() {
+    return {
+        name 'Entity Pruner'
+        packaging 'jar'
+        description 'A Utility for making an ORM managed graph safe for sending to a client'
+        url 'https://github.com/stevesaliman/entity-pruner'
+        licenses {
+            license {
+                name 'The Apache Software License, Version 2.0'
+                url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                distribution 'repo'
+            }
+        }
+        developers {
+            developer {
+                id 'stevesaliman'
+                name 'Steven C. Saliman'
+                email 'support@saliman.net'
+            }
+        }
+        scm {
+            connection 'scm:https://stevesaliman@github.com/stevesaliman/entity-pruner'
+            developerConnection 'scm:git@github.com:stevesaliman/entity-pruner.git'
+            url 'https://github.com/stevesaliman/entity-pruner'
+        }
+    }
 }
 

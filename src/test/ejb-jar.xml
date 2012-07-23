@@ -9,8 +9,8 @@
 				<session>
 					<display-name>EntityPruner</display-name>
 					<ejb-name>EntityPruner</ejb-name>
-					<business-local>com.saliman.entitypruner.EntityPruner</business-local>
-					<ejb-class>com.saliman.entitypruner.EntityPrunerHibernateJpa</ejb-class>
+					<business-local>net.saliman.entitypruner.EntityPruner</business-local>
+					<ejb-class>net.saliman.entitypruner.EntityPrunerHibernateJpa</ejb-class>
 					<session-type>Stateless</session-type>
 				</session>
   </enterprise-beans>
