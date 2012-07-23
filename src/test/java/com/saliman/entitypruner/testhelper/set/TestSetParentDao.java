@@ -1,9 +1,8 @@
 package com.saliman.entitypruner.testhelper.set;
 
-import javax.ejb.Local;
-
 import com.saliman.entitypruner.testhelper.BaseDao;
 
+import javax.ejb.Local;
 
 /**
  * This class only exists to test the Framework code. 
@@ -12,5 +11,5 @@ import com.saliman.entitypruner.testhelper.BaseDao;
  */
 @Local
 public interface TestSetParentDao extends BaseDao<TestSetParentEntity> {
-    // no new methods.
+// No new methods needed
 }

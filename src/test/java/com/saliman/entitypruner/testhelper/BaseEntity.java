@@ -9,6 +9,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.MappedSuperclass;
+import javax.persistence.SequenceGenerator;
 import javax.persistence.Transient;
 import javax.persistence.Version;
 
@@ -95,13 +96,13 @@ public abstract class BaseEntity implements Serializable, PrunableEntity {
     private static final Long DEFAULT_VERSION = new Long(0);
 
     @Id
-    @GeneratedValue(strategy=GenerationType.SEQUENCE, generator="ID_GENERATOR")
-    //@SequenceGenerator(name="ID_GENERATOR", sequenceName="id_generator_seq", allocationSize=1)
-    @GenericGenerator(name="ID_GENERATOR",
-                      strategy = "com.saliman.entitypruner.testhelper.BigIntegerSequenceGenerator",
-                      parameters = {
-                          @Parameter(name="sequence", value="id_generator_seq")
-                      })
+    @GeneratedValue(strategy=GenerationType.AUTO, generator="ID_GENERATOR")
+    @SequenceGenerator(name="ID_GENERATOR", sequenceName="id_generator_seq", allocationSize=1)
+//    @GenericGenerator(name="ID_GENERATOR",
+//                      strategy = "com.saliman.entitypruner.testhelper.BigIntegerSequenceGenerator",
+//                      parameters = {
+//                          @Parameter(name="sequence", value="id_generator_seq")
+//                      })
     @Column(name="id", nullable=true)
     private BigInteger id;
     

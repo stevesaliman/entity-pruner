@@ -1,7 +1,9 @@
 package com.saliman.entitypruner.testhelper.junit;
 
+import com.saliman.entitypruner.testhelper.DatabaseType;
+
 import javax.ejb.Local;
-import javax.persistence.EntityManager;
+
 
 /**
  * Interface for a Stateless bean that provides a transactional context for
@@ -14,12 +16,19 @@ import javax.persistence.EntityManager;
  */
 @Local
 public interface JpaTransaction {
-    /**
-     * @return an <code>EntityManager</code> that can be injected into DAOs
-     * or used by tests if needed.  The preferred way to configure a DAO is 
-     * to simply request a DAO bean from an embedded container.
-     */
-    public EntityManager getEntityManager();
+	/**
+	 * @return the database type in use.
+	 */
+	public DatabaseType getDatabaseType();
+
+	/**
+	 * Set the database type for this transaction.  Sometimes, we need to do
+	 * things a little differently based on the underlying database. For 
+	 * example, Oracle needs special handling of bind variables in a native
+	 * query.
+	 * @param databaseType the database type to use.
+	 */
+	public void setDatabaseType(DatabaseType databaseType);
 
     /**
      * @return the defaultRollback

@@ -1,8 +1,14 @@
 package com.saliman.entitypruner.testhelper.list;
 
-import java.io.Serializable;
-import java.util.Date;
-import java.util.List;
+import com.google.common.base.Objects;
+import com.saliman.entitypruner.EntityPruner;
+import com.saliman.entitypruner.PrunableEntity;
+import com.saliman.entitypruner.testhelper.AuditableEntity;
+import com.saliman.entitypruner.testhelper.BaseDaoJpa;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.hibernate.annotations.OptimisticLockType;
+import org.hibernate.annotations.Type;
 
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
@@ -12,19 +18,9 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 import javax.persistence.Transient;
-
-import org.apache.commons.lang.builder.EqualsBuilder;
-import org.apache.commons.lang.builder.HashCodeBuilder;
-import org.apache.commons.lang.builder.ToStringBuilder;
-import org.hibernate.annotations.Cache;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
-import org.hibernate.annotations.OptimisticLockType;
-import org.hibernate.annotations.Type;
-
-import com.saliman.entitypruner.EntityPruner;
-import com.saliman.entitypruner.PrunableEntity;
-import com.saliman.entitypruner.testhelper.AuditableEntity;
-import com.saliman.entitypruner.testhelper.BaseDaoJpa;
+import java.io.Serializable;
+import java.util.Date;
+import java.util.List;
 
 
 /** 
@@ -274,12 +270,13 @@ public class TestListParentEntity extends AuditableEntity implements Serializabl
     }
 
     // Hibernate Required Code
+	@Override
     public String toString() {
-        return new ToStringBuilder(this).append("id", getId())
-                                       .toString();
+        return Objects.toStringHelper(this).add("id", getId()).toString();
     }
 
-    public boolean equals(Object other) {
+	@Override
+	public boolean equals(Object other) {
         if ( other == null ) {
             return false;
         }
@@ -293,12 +290,11 @@ public class TestListParentEntity extends AuditableEntity implements Serializabl
         }
 
         TestListParentEntity castOther = (TestListParentEntity) other;
-        return new EqualsBuilder().append(this.getCode(), castOther.getCode())
-                                  .isEquals();
+        return Objects.equal(this.getCode(), castOther.getCode());
     }
 
-    public int hashCode() {
-        return new HashCodeBuilder().append(getCode())
-                                    .toHashCode();
+	@Override
+	public int hashCode() {
+        return Objects.hashCode(getCode());
     }
 }

@@ -82,4 +82,13 @@ public interface Options {
      * to the attribute name.  Passing invalid attributes will cause errors.
      */
     public static final String ORDER = "order";
+
+	/**
+	 * {@code OptionMap} constant used by some operations to set a lock on
+	 * a record when it reads it from the database.  This is useful to avoid
+	 * concurrent modification issues.  The values of this constant should
+	 * match the valid constants of the {@code LockModeType} class.
+	 */
+	public static final String LOCK_MODE = "lockMode";
+
 }

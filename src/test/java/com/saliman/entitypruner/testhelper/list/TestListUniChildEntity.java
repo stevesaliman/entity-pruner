@@ -1,20 +1,16 @@
 package com.saliman.entitypruner.testhelper.list;
 
-import java.io.Serializable;
-import java.math.BigInteger;
-
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Table;
-
-import org.apache.commons.lang.builder.EqualsBuilder;
-import org.apache.commons.lang.builder.HashCodeBuilder;
-import org.apache.commons.lang.builder.ToStringBuilder;
+import com.google.common.base.Objects;
+import com.saliman.entitypruner.testhelper.AuditableEntity;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.annotations.OptimisticLockType;
 
-import com.saliman.entitypruner.testhelper.AuditableEntity;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import java.io.Serializable;
+import java.math.BigInteger;
 
 
 /** 
@@ -99,8 +95,7 @@ public class TestListUniChildEntity extends AuditableEntity
 
     // Hibernate Required Code
     public String toString() {
-        return new ToStringBuilder(this).append("id", getId())
-                                       .toString();
+	    return Objects.toStringHelper(this).add("id", getId()).toString();
     }
 
     public boolean equals(Object other) {
@@ -117,14 +112,11 @@ public class TestListUniChildEntity extends AuditableEntity
         }
 
         TestListUniChildEntity castOther = (TestListUniChildEntity) other;
-        return new EqualsBuilder().append(this.getParentId(), castOther.getParentId())
-                                  .append(this.getCode(), castOther.getCode())
-                                  .isEquals();
+        return Objects.equal(this.getParentId(), castOther.getParentId())
+				&& Objects.equal(this.getCode(), castOther.getCode());
     }
 
     public int hashCode() {
-        return new HashCodeBuilder().append(parentId)
-                                    .append(code)
-                                    .toHashCode();
+        return Objects.hashCode(getParentId(), getCode());
     }
 }

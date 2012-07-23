@@ -14,13 +14,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.saliman.entitypruner.testhelper.junit.AbstractGlassFishContainerTest;
 import org.hibernate.collection.PersistentSet;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.saliman.entitypruner.testhelper.BaseDaoJpa;
-import com.saliman.entitypruner.testhelper.junit.AbstractEjb3ContainerTest;
 import com.saliman.entitypruner.testhelper.junit.Transactable;
 import com.saliman.entitypruner.testhelper.set.TestSetChildDao;
 import com.saliman.entitypruner.testhelper.set.TestSetChildEntity;
@@ -60,13 +60,13 @@ import com.saliman.entitypruner.testhelper.set.TestSetUniChildEntity;
  * @see BaseDaoJpaQuerySetTest 
  * @author Steven C. Saliman
  */
-public class EntityUtilSetTest extends AbstractEjb3ContainerTest  {
+public class EntityUtilSetTest extends AbstractGlassFishContainerTest {
     // These constant names reflect OpenEjb naming conventions. We'll need to
     // change these to reflect embedded GlassFish when we switch.
-    private static final String PARENT_DAO_NAME = "TestSetParentDaoLocal";
-    private static final String CHILD_DAO_NAME = "TestSetChildDaoLocal";
-    private static final String UNI_CHILD_DAO_NAME = "TestSetUniChildDaoLocal";
-    private static final String PRUNER_NAME = "EntityPrunerLocal";
+    private static final String PARENT_DAO_NAME = "TestSetParentDaoOracle";
+    private static final String CHILD_DAO_NAME = "TestSetChildDaoOracle";
+    private static final String UNI_CHILD_DAO_NAME = "TestSetUniChildDaoOracle";
+    private static final String PRUNER_NAME = "EntityPruner";
     private static final String PARENT_TABLE = "TEST_PARENT";
     private static final String CHILD_TABLE = "TEST_CHILD";
     private static final String UNI_CHILD_TABLE = "TEST_UNI_CHILD";

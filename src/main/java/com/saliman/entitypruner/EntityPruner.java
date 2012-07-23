@@ -8,13 +8,13 @@ import javax.ejb.Local;
  * This interface defines methods to &quot;prunes&quot; entities so they can be
  * serialized or Marshalled for use in Web Service and RMI calls. 
  * <p>
- * Entities must implement the {@link Prunable} interface to be pruned
+ * Entities must implement the {@link PrunableEntity} interface to be pruned
  * with implementations of this class.
  * <p>
  * implementations of this class will most likely be heavily dependent on
  * the internals of of the persistence mechanism used in an application.
  * 
- * @see Prunable
+ * @see PrunableEntity
  *
  * @author Steven C. Saliman
  */
@@ -150,7 +150,7 @@ public interface EntityPruner {
      * Specifying an include or select will <b>not</b> cause the EntityPruner
      * to fetch missing data from the database.  If you are specifying 
      * options, you should probably call 
-     * {@link EntityUtil#populateEntity(com.pinnacol.framework.entity.Persistable, Map)}
+     * {@link EntityUtil#populateEntity(PrunableEntity, Map)}
      * to make sure all the desired children are present.
      * <p>
      * When specifying both a depth and options, the <code>EntityPruner</code>

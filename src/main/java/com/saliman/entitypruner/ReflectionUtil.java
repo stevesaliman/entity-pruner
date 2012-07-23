@@ -8,7 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 /**
  * This class contains utilities for working with reflection.
  * 
@@ -16,10 +17,10 @@ import org.apache.log4j.Logger;
  */
 public class ReflectionUtil {
 	// caches to try and avoid the performance hit of reflection.
-	private static Map<String, List<Field>> beanFieldMap = new ConcurrentHashMap<String, List<Field>>(200, 0.75F, 100);
-    private static Map<String, Field>fieldMap = new ConcurrentHashMap<String, Field>(200, 0.75F, 100);
+	private static Map<String, List<Field>> beanFieldMap = new ConcurrentHashMap<String, List<Field>>();
+    private static Map<String, Field>fieldMap = new ConcurrentHashMap<String, Field>();
 	/** logger for the class */
-    private static final Logger LOG = Logger.getLogger(ReflectionUtil.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ReflectionUtil.class);
 
     /**
      * Get all of the fields in a class that can be both read and written

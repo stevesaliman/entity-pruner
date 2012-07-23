@@ -2,9 +2,20 @@
 <!-- This is the main Spring configuration file for unit tests. -->
 <beans xmlns="http://www.springframework.org/schema/beans"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-       xsi:schemaLocation="http://www.springframework.org/schema/beans
-             http://www.springframework.org/schema/beans/spring-beans-2.5.xsd">
-    <!-- 
+       xmlns:p="http://www.springframework.org/schema/p"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xmlns:jee="http://www.springframework.org/schema/jee"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="
+           http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd
+           http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.0.xsd
+           http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-3.0.xsd
+           http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-2.0.xsd
+           http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+<!--
         This the the test version of the main Spring configuration file. It is 
         the root of the Spring configuration. This file should not be modified.
         The only beans that belong in this file are the property configurer, 
@@ -59,14 +70,123 @@
     <!-- import other configuration files here. Do NOT import 
          framework-security.xml unless you want a lot of bogus application
          startup and shutdown events firing. -->
-    <import resource="classpath:db-nocontainer.xml"/>
-    <!--  import resource="classpath:framework-sercurity.xml"/ -->
-    <!-- import resource="classpath:framework-jmx.xml"/-->
-    
     <!-- Configurer that replaces ${...} placeholders with values from 
          properties files. The framework version decrypts values that start
          with "{aes}" -->
-    <bean id="propertyConfigurer"
+		<context:component-scan base-package="com.saliman.entitypruner"/>
+		<tx:annotation-driven />
+
+	<!--==================== DATABASE SECTION ============================ -->
+	<!--
+						Since the Framework supports both Oracle and MySql databases, We will
+						need to setup 2 data sources, which means we'll need to use JTA
+						instead of just JPA.  We'll use Atomikos to take care of JTA in our
+						Spring tests.  MySql and Atomikos have issues with XA data sources,
+						so Oracle will be an XA data source, and MySql will be a regular one.
+				-->
+
+	<!-- The Oracle data source -->
+	<bean id="oracleDataSource"
+	      class="com.atomikos.jdbc.AtomikosDataSourceBean"
+	      destroy-method="close">
+		<property name="uniqueResourceName" value="oracleDataSource"/>
+		<property name="xaDataSourceClassName"
+		          value="oracle.jdbc.xa.client.OracleXADataSource"/>
+		<property name="xaProperties">
+			<props>
+				<prop key="user">${oracle.jdbc.username}</prop>
+				<prop key="password">${oracle.jdbc.password}</prop>
+				<prop key="driverType">4</prop>
+				<prop key="URL">${oracle.jdbc.url}</prop>
+			</props>
+		</property>
+		<property name="maxPoolSize" value="10"/>
+		<property name="minPoolSize" value="1"/>
+		<property name="reapTimeout" value="0"></property>
+	</bean>
+
+	<!-- The MySql data source -->
+	<bean id="mysqlDataSource"
+	      class="com.atomikos.jdbc.nonxa.AtomikosNonXADataSourceBean">
+		<property name="uniqueResourceName" value="mysqlDataSource"/>
+		<property name="user" value="${mysql.jdbc.username}" />
+		<property name="password" value="${mysql.jdbc.password}" />
+		<property name="url" value="${mysql.jdbc.url}" />
+		<property name="driverClassName" value="com.mysql.jdbc.Driver" />
+		<property name="maxPoolSize" value="10"/>
+		<property name="minPoolSize" value="1"/>
+		<property name="reapTimeout" value="0"></property>
+	</bean>
+
+	<!-- Since we won't be running in a container that can do a JNDI lookup,
+						 we need to define a Persistence Unit Manager to map data sources in
+						 the persistence.xml with the data source beans we've defined here. -->
+	<bean id="pum"
+	      class="org.springframework.orm.jpa.persistenceunit.DefaultPersistenceUnitManager">
+		<property name="persistenceXmlLocation"
+		          value="classpath*:META-INF/persistence.xml"/>
+		<property name="dataSources">
+			<map>
+				<entry key="${oracle.data.source}" value-ref="oracleDataSource"/>
+				<entry key="${mysql.data.source}" value-ref="mysqlDataSource"/>
+			</map>
+		</property>
+	</bean>
+
+	<!-- The Entity Manager Factories for each connection -->
+	<bean id="entityManagerFactory"
+	      class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+		<property name="persistenceUnitManager" ref="pum"/>
+		<property name="persistenceUnitName" value="default"/>
+		<property name="jpaVendorAdapter">
+			<bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter" >
+			</bean>
+		</property>
+		<property name="jpaProperties" ref="jpaProperties"/>
+	</bean>
+
+	<bean id="mysqlEntityManagerFactory"
+	      class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+		<property name="persistenceUnitManager" ref="pum"/>
+		<property name="persistenceUnitName" value="mysql"/>
+		<property name="jpaVendorAdapter">
+			<bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter" >
+			</bean>
+		</property>
+		<property name="jpaProperties" ref="jpaProperties"/>
+	</bean>
+
+	<!-- The Atomikos Transaction Management beans -->
+	<bean id="atomikosTransactionManager"
+	      class="com.atomikos.icatch.jta.UserTransactionManager"
+	      init-method="init" destroy-method="close">
+		<property name="forceShutdown" value="false"/>
+	</bean>
+
+	<bean id="atomikosUserTransaction"
+	      class="com.atomikos.icatch.jta.UserTransactionImp">
+		<property name="transactionTimeout" value="300"/>
+	</bean>
+
+	<!-- Finally, the transaction manager that uses all the above -->
+	<bean id="transactionManager"
+	      class="org.springframework.transaction.jta.JtaTransactionManager"
+	      depends-on="atomikosTransactionManager,atomikosUserTransaction">
+		<property name="transactionManager" ref="atomikosTransactionManager"/>
+		<property name="userTransaction" ref="atomikosUserTransaction"/>
+		<!-- This is required for Spring Batch set set a custom isolation level when it runs -->
+		<property name="allowCustomIsolationLevels" value="true"/>
+	</bean>
+
+	<!-- Some properties we need to get Hibernate and Atomikos playing nice -->
+	<util:properties id="jpaProperties">
+		<prop key="hibernate.current_session_context_class">jta</prop>
+		<prop key="hibernate.transaction.manager_lookup_class">com.atomikos.icatch.jta.hibernate3.TransactionManagerLookup</prop>
+	</util:properties>
+
+	<!--==============  Entity Pruner specific Spring definitions ==============-->
+
+	<bean id="propertyConfigurer"
           class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
     <property name="locations">
         <list>
@@ -75,22 +195,72 @@
         </property>
     </bean>
 
-    <bean id="testSetParentDaoJpa"
-        class="com.saliman.entitypruner.testhelper.set.TestSetParentDaoJpa"
-        scope="singleton">
-    </bean>
+	<!-- Oracle List Daos -->
+	<bean id="TestListParentDaoOracle"
+	      class="com.saliman.entitypruner.testhelper.list.TestListParentDaoJpaOracle"
+	      scope="singleton">
+	</bean>
 
-    <bean id="testSetChildDaoJpa"
-        class="com.saliman.entitypruner.testhelper.set.TestSetChildDaoJpa"
-        scope="singleton">
-    </bean>
+	<bean id="TestListChildDaoOracle"
+	      class="com.saliman.entitypruner.testhelper.list.TestListChildDaoJpaOracle"
+	      scope="singleton">
+	</bean>
 
-    <bean id="testSetUniChildDaoJpa"
-        class="com.saliman.entitypruner.testhelper.set.TestSetUniChildDaoJpa"
-        scope="singleton">
-    </bean>
-    <!-- The EntityPuner -->
-    <bean id="entityPruner"
+	<bean id="TestListUniChildDaoOracle"
+	      class="com.saliman.entitypruner.testhelper.list.TestListUniChildDaoJpaOracle"
+	      scope="singleton">
+	</bean>
+
+	<!-- Oracle Set Daos -->
+	<bean id="TestSetParentDaoOracle"
+	      class="com.saliman.entitypruner.testhelper.set.TestSetParentDaoJpaOracle"
+	      scope="singleton">
+	</bean>
+
+	<bean id="TestSetChildDaoOracle"
+	      class="com.saliman.entitypruner.testhelper.set.TestSetChildDaoJpaOracle"
+	      scope="singleton">
+	</bean>
+
+	<bean id="TestSetUniChildDaoOracle"
+	      class="com.saliman.entitypruner.testhelper.set.TestSetUniChildDaoJpaOracle"
+	      scope="singleton">
+	</bean>
+
+	<!-- MySql List Daos -->
+	<bean id="TestListParentDaoMysql"
+	      class="com.saliman.entitypruner.testhelper.list.TestListParentDaoJpaMysql"
+	      scope="singleton">
+	</bean>
+
+	<bean id="TestListChildDaoMysql"
+	      class="com.saliman.entitypruner.testhelper.list.TestListChildDaoJpaMysql"
+	      scope="singleton">
+	</bean>
+
+	<bean id="TestListUniChildDaoMysql"
+	      class="com.saliman.entitypruner.testhelper.list.TestListUniChildDaoJpaMysql"
+	      scope="singleton">
+	</bean>
+
+	<!-- MySql Set Daos -->
+	<bean id="TestSetParentDaoMysql"
+	      class="com.saliman.entitypruner.testhelper.set.TestSetParentDaoJpaMysql"
+	      scope="singleton">
+	</bean>
+
+	<bean id="TestSetChildDaoMysql"
+	      class="com.saliman.entitypruner.testhelper.set.TestSetChildDaoJpaMysql"
+	      scope="singleton">
+	</bean>
+
+	<bean id="TestSetUniChildDaoMysql"
+	      class="com.saliman.entitypruner.testhelper.set.TestSetUniChildDaoJpaMysql"
+	      scope="singleton">
+	</bean>
+
+	<!-- The EntityPuner -->
+    <bean id="EntityPruner"
           class="com.saliman.entitypruner.EntityPrunerHibernateJpa"
           scope="singleton">
     </bean>

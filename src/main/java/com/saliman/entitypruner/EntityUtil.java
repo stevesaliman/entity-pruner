@@ -13,10 +13,11 @@ import java.util.Set;
 
 import javax.persistence.Transient;
 
-import org.apache.log4j.Logger;
 import org.hibernate.collection.PersistentCollection;
 import org.hibernate.proxy.HibernateProxy;
 import org.hibernate.proxy.LazyInitializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is a utility class for working with Entity instances and their
@@ -38,7 +39,7 @@ import org.hibernate.proxy.LazyInitializer;
  */
 public class EntityUtil {
     /** logger for the class */
-    private static final Logger LOG = Logger.getLogger(EntityUtil.class);
+    private static final Logger LOG = LoggerFactory.getLogger(EntityUtil.class);
 
     /**
      * Determines if a collection has been initialized. This is most useful 
@@ -71,7 +72,7 @@ public class EntityUtil {
     /**
      * Copies the transient attributes from one entity to another.  This 
      * is needed when we save an Entity, because the 
-     * {@link BaseDao#save(Persistable)} returns a copy of the original entity,
+     * {@link BaseDao#save(PrunableEntity)} returns a copy of the original entity,
      * refreshed from the database, which can cause the transient attributes to
      * be lost.
      * @param source the source entity
@@ -137,7 +138,7 @@ public class EntityUtil {
      * <p>
      * This method can only be called within a session, or we'll get lazy 
      * loading errors.
-     * @param entity the {@link Persistable} entity to populate
+     * @param entity the {@link PrunableEntity} entity to populate
      * @param options the map of options that should be used.
      */
     public static void populateEntity(PrunableEntity entity, Map<String, String> options) {
@@ -256,6 +257,32 @@ public class EntityUtil {
     }
 
     /**
+     * Replace proxy objects with actual classes. This is needed because Flex
+     * won't know how to map a proxy class to a Flex entity, and even if it 
+     * did, there would be a lot of extra data that Flex doesn't need.
+     * <p> 
+     * The expectation is that this method, like others in this class, will 
+     * be called inside of a session, so that uninitialized proxies can be
+     * initialized later.
+     * <p>
+     * Most of the time, the class returned by a hibernate query will be 
+     * correct.  The most common use case for this method is when business
+     * logic wants to return entities that were obtained from other entities,
+     * rather than queried directly.  For example, we query the database for
+     * a department, then return the department's children.
+     * @param entity the entity containing the value we are de-proxying.
+     * @return the original object, cast to the entity class.
+     * @throws ClassCastException If we can't make the cast.
+     */
+    public static PrunableEntity deproxy(PrunableEntity entity) throws ClassCastException {
+        if ( entity instanceof HibernateProxy ) {
+        	LazyInitializer initializer = ((HibernateProxy) entity).getHibernateLazyInitializer();
+        	return (PrunableEntity)initializer.getImplementation();
+        }
+        return entity;
+     }
+    
+    /**
      * Gets the value from the given field.  We can't just use field.get 
      * because Hibernate doesn't always store the value in the field. It seems
      * to store it in some CGLIB field, using proxy methods to get to it. We,
@@ -311,7 +338,7 @@ public class EntityUtil {
      * @throws InvocationTargetException 
      * @throws IllegalAccessException 
      * @throws IllegalArgumentException 
-     * @see #getValue(Field, Persistable)
+     * @see #getValue(Field, PrunableEntity)
      */
     private static void setValue(Field field, PrunableEntity entity, Object value)
                    throws SecurityException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {

@@ -26,7 +26,6 @@ import javax.persistence.OneToOne;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Transient;
 
-import org.apache.log4j.Logger;
 import org.hibernate.collection.PersistentCollection;
 import org.hibernate.collection.PersistentList;
 import org.hibernate.collection.PersistentSet;
@@ -35,11 +34,16 @@ import org.hibernate.ejb.EntityManagerImpl;
 import org.hibernate.impl.SessionImpl;
 import org.hibernate.proxy.HibernateProxy;
 import org.hibernate.proxy.LazyInitializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * This class provides an implementation of the {@link EntityPruner} for 
  * applications using JPA and Hibernate.  It is intended to be used as a 
- * stateless session bean inside a Java EE container like GlassFish.
+ * stateless session bean inside a Java EE container like GlassFish, or a Spring
+ * container using a JPA transaction manager.
  * <p>
  * Entities must implement the {@link PrunableEntity} interface to be pruned
  * with this class.  This implementation is designed to work with entities 
@@ -55,23 +59,25 @@ import org.hibernate.proxy.LazyInitializer;
  * <p>
  * Since the EntityPruner logs its activity, we recommend Entities implement
  * a <code>toString()</code> method.
+ * <p>
+ * This class has been tested in GlassFish 2 & 3, and Spring 3.1.
  * 
  * @see PrunableEntity
  * 
  * @author Steven C. Saliman
  */
-// we need the stateless annotation to make the unit tests work.
+// we need the Stateless annotation to make the unit tests work.
 @Stateless(name="EntityPruner")
+@Transactional(propagation=Propagation.NOT_SUPPORTED)
 @TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
 public class EntityPrunerHibernateJpa implements EntityPruner {
     /** logger for the class */
-    private static final Logger LOG = Logger.getLogger(EntityPruner.class);
+    private static final Logger LOG = LoggerFactory.getLogger(EntityPruner.class);
     
-//    @PersistenceContext(unitName="default") // FOR DRE
-    @PersistenceContext
-    private EntityManager entityManager;
+    @PersistenceContext(unitName="default")
+    protected EntityManager entityManager;
 
-    /**
+	/**
      * Prune the given entity to prepare it for serializing for RMI, or
      * Marshalling to XML for SOAP or REST. It is very important that this 
      * happens outside a transaction, otherwise the JPA provider will assume
@@ -115,6 +121,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      * @param entity the {@link PrunableEntity} to pruned
      * @throws IllegalStateException if there is a problem.
      */
+    @Transactional(propagation=Propagation.NOT_SUPPORTED)
     @TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
     @Override
     public void prune(PrunableEntity entity) {
@@ -230,7 +237,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      * Specifying an include or select will <b>not</b> cause the EntityPruner
      * to fetch missing data from the database.  If you are specifying 
      * options, you should probably call 
-     * {@link EntityUtil#populateEntity(Persistable, Map)}
+     * {@link EntityUtil#populateEntity(PrunableEntity, Map)}
      * to make sure all the desired children are present.
      * <p>
      * When specifying both a depth and options, the <code>EntityPruner</code>
@@ -241,6 +248,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      *        Rails conventions.
      * @throws IllegalStateException if there is a problem.
      */
+    @Transactional(propagation=Propagation.NOT_SUPPORTED)
     @TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
     @Override
     public void prune(PrunableEntity entity, Map<String, String> options) {
@@ -312,7 +320,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
                 Object value = getValue(field, entity);
                 if ( value != null ) {
                     if ( PrunableEntity.class.isAssignableFrom(value.getClass()) ) {
-                        // If this is another PrunableEntity entity, and we want to
+                        // If this is another Prunable entity, and we want to
                     	// include it, then de-proxy it, and set the field's 
                     	// value to the de-proxied value and prune it.
                     	if ( selectSet != null &&
@@ -331,7 +339,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
                         // the collection.
                         pruneCollection(entity, depth, includeSet, (Collection<?>)value, field);
                     } else {
-                    	// This isn't a PrunableEntity, or a collection, If we have
+                    	// This isn't a Prunable, or a collection, If we have
                     	// a "select" list, and it doesn't contain the current
                     	// attribute, prune it out and set the entity to a
                     	// partial state.  We can only do this if we're not
@@ -381,6 +389,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      * @param entity the {@link PrunableEntity} to un-prune
      * @throws IllegalStateException if something goes wrong
      */
+    @Transactional(propagation=Propagation.REQUIRED)
     @TransactionAttribute(TransactionAttributeType.REQUIRED)
     @Override
     public void unprune(PrunableEntity entity) {
@@ -432,7 +441,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
                 field.setAccessible(true);
                 Object value = getValue(field, entity);
                 if ( PrunableEntity.class.isAssignableFrom(field.getType()) ) {
-                    // If this is another PrunableEntity entity, restore the proxy
+                    // If this is another Prunable entity, restore the proxy
                     // class.  The helper method de-prunes it if necessary.
                     reproxy(entity, (PrunableEntity)value, field, session);
                 } else if ( Collection.class.isAssignableFrom(field.getType()) ) {
@@ -491,7 +500,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      * @throws SecurityException 
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private void pruneCollection(PrunableEntity entity, 
+    private void pruneCollection(PrunableEntity entity,
                                         int depth,
                                         Set<String> includeSet,
                                         Collection<?> collection,
@@ -656,7 +665,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      * Helper to the helper that gets the child's parent field.
      * @param entity the entity containing the child
      * @param field the field containing the child
-     * @param child the class of the child
+     * @param childClazz the class of the child
      */
     private Field loadChildsParentField(PrunableEntity entity, Field field,
                                         Class<?> childClazz) {
@@ -784,7 +793,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      * @throws InvocationTargetException 
      * @throws IllegalAccessException 
      * @throws IllegalArgumentException 
-     * @see #getValue(Field, Persistable)
+     * @see #getValue(Field, PrunableEntity)
      */
     private void setValue(Field field, PrunableEntity entity, Object value)
                    throws SecurityException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
@@ -810,7 +819,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      * if it hasn't it will return null after storing the proxy's ID for 
      * future unpruning.
      * <p>
-     * This method is different from {@link EntityUtil#deproxy(Persistable)}.
+     * This method is different from {@link EntityUtil#deproxy(PrunableEntity)}.
      * This method is used to de-proxy the attribute of an entity, storing 
      * references to the ID of uninitialized proxies.  The version in 
      * EntityUtil is intended to be used to de-proxy an entity itself, and 
@@ -832,7 +841,7 @@ public class EntityPrunerHibernateJpa implements EntityPruner {
      *         value represents an uninitialized proxy.
      * @throws ClassCastException If we can't make the cast.
      */
-    private <T> T deproxy(PrunableEntity entity, Object value, String fieldName, 
+    private <T> T deproxy(PrunableEntity entity, Object value, String fieldName,
             Class<T> entityClass) throws ClassCastException {
         if ( value instanceof HibernateProxy ) {
             LazyInitializer initializer = ((HibernateProxy) value).getHibernateLazyInitializer();

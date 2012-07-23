@@ -1,22 +1,18 @@
 package com.saliman.entitypruner.testhelper.list;
 
-import java.io.Serializable;
+import com.google.common.base.Objects;
+import com.saliman.entitypruner.testhelper.AuditableEntity;
+import com.saliman.entitypruner.testhelper.BaseDaoJpa;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.hibernate.annotations.OptimisticLockType;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
-
-import org.apache.commons.lang.builder.EqualsBuilder;
-import org.apache.commons.lang.builder.HashCodeBuilder;
-import org.apache.commons.lang.builder.ToStringBuilder;
-import org.hibernate.annotations.Cache;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
-import org.hibernate.annotations.OptimisticLockType;
-
-import com.saliman.entitypruner.testhelper.AuditableEntity;
-import com.saliman.entitypruner.testhelper.BaseDaoJpa;
+import java.io.Serializable;
 
 
 /** 
@@ -99,11 +95,12 @@ public class TestListChildEntity extends AuditableEntity
     }
 
     // Hibernate Required Code
+	@Override
     public String toString() {
-        return new ToStringBuilder(this).append("id", getId())
-                                       .toString();
+	    return Objects.toStringHelper(this).add("id", getId()).toString();
     }
 
+	@Override
     public boolean equals(Object other) {
         if ( other == null ) {
             return false;
@@ -118,14 +115,12 @@ public class TestListChildEntity extends AuditableEntity
         }
 
         TestListChildEntity castOther = (TestListChildEntity) other;
-        return new EqualsBuilder().append(this.getParent(), castOther.getParent())
-                                  .append(this.getCode(), castOther.getCode())
-                                  .isEquals();
+        return Objects.equal(this.getParent(), castOther.getParent())
+				&& Objects.equal(this.getCode(), castOther.getCode());
     }
 
+	@Override
     public int hashCode() {
-        return new HashCodeBuilder().append(parent)
-                                    .append(code)
-                                    .toHashCode();
+        return Objects.hashCode(getParent(), getCode());
     }
 }

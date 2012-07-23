@@ -1,12 +1,11 @@
 package com.saliman.entitypruner.testhelper.set;
 
+import com.saliman.entitypruner.testhelper.BaseDao;
+
 import java.math.BigInteger;
 import java.util.List;
 
 import javax.ejb.Local;
-
-import com.saliman.entitypruner.testhelper.BaseDao;
-
 
 /**
  * This class only exists to test the Framework code. 
@@ -15,7 +14,7 @@ import com.saliman.entitypruner.testhelper.BaseDao;
  */
 @Local
 public interface TestSetChildDao extends BaseDao<TestSetChildEntity> {
-    /**
+	/**
      * Find children with the specified parent id.
      * @param parentId
      * @return a list of children.

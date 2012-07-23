@@ -1,0 +1,13 @@
+Manifest-Version: 1.0
+Archiver-Version: Plexus Archiver
+Created-By: Apache Maven
+Built-By: java_re
+Build-Jdk: 1.6.0_10
+Glassfish-require-services: org.glassfish.api.admingui.ConsoleProvider
+HK2-Import-Bundles: org.glassfish.admingui.console-common,com.sun.ente
+ rprise.hk2,org.glassfish.admingui.console-plugin-service, org.glassfi
+ sh.deployment.deployment-client,org.glassfish.registration.registrati
+ on-api,org.glassfish.registration.registration-impl, org.glassfish.ja
+ vax.servlet, org.glassfish.javax.servlet.jsp, com.sun.jsftemplating, 
+ org.glassfish.admingui.dataprovider, com.sun.pkg.client
+

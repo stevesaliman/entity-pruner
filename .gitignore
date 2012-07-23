@@ -1,0 +1,53 @@
+# Eclipse configuration and build files. 
+/.classpath
+/.project
+/.settings
+/eclipse-build
+/eclipse-build
+/eclipse-config
+
+#Idea configuration and build files
+/.idea/
+/*.iml
+/*.ipr
+/*.iws
+/out
+
+# The sandbox property file, and the Files created by the ant build. There
+# needs to be a .gitignore in the embedded glassfish's applications, autodeploy,
+# osgi-cache, and generated directories to ignore their contents.
+/gradle-local.properties
+/.gradle
+/gradle-app.setting
+/build
+/dist
+/docs/api
+src/test/resources/application.properties
+src/test/resources/application-test.properties
+src/test/resources/applicationContext-test.xml
+src/test/resources/env.properties
+src/test/resources/log4j.properties
+src/test/resources/META-INF/persistence.xml
+src/test/java/META-INF/persistence.xml
+src/test/java/META-INF/persistence-local.xml
+
+properties/applicationContext-test.xml.jpa
+properties/framework.xml.jpa
+/glassfish-3.1.1/domains/domain1/config/domain.xml
+# Files created by Atomikos when unit test run.
+tm.out
+tm.out.lck
+tmlog.lck
+*.epoch
+*.bak
+*.log
+*.log.*
+.DS_Store
+
+glassfish-3.1.1/domains/domain1/applications
+glassfish-3.1.1/domains/domain1/autodeploy
+glassfish-3.1.1/domains/domain1/generated
+glassfish-3.1.1/domains/domain1/osgi-cache
+
+# Vim swap files
+*.swp

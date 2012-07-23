@@ -1,0 +1,393 @@
+#!groovy
+// The above triggers groovy syntax highlighting in vim
+buildscript {
+	repositories {
+		mavenLocal()
+		mavenCentral()
+	}
+	dependencies {
+		classpath "net.saliman:gradle-properties-plugin:1.0.2"
+	}
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'maven'
+apply plugin: 'signing'
+apply plugin: "properties"
+
+sourceCompatibility = 1.6
+targetCompatibility = 1.6
+version = "1.0.2"
+group = "net.saliman"
+archivesBaseName = "entity-pruner"
+ext.isSnapshot = version.endsWith("SNAPSHOT")
+
+if ( isSnapshot ) {
+    println "using snapshot"
+    ext.mavenRepoUploadUrl = "https://oss.sonatype.org/content/repositories/snapshots/"
+} else {
+    println "using staging"
+    ext.mavenRepoUploadUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+}
+
+
+// Define the properties used by the build
+def templateDir = "templates"
+// Directory locations 
+def propertyDir = "properties"
+def eclipseTargetDir = "eclipse-target"
+def distDir = "dist"
+def testDir = "src/test"
+def testSrcDir = "src/test/java"
+def testResourceDir = "src/test/resources"
+def testLibDir = "${buildDir}/libs/test"
+def embeddedServerDir = "glassfish-3.1.1"
+def embeddedDomainDir = "${embeddedServerDir}/domains/domain1"
+// library versions
+def hibernateVersion = "3.6.9.Final"
+def springVersion = "3.1.0.RELEASE"
+def slf4jVersion = "1.6.4"
+def log4jVersion = "1.2.16"
+def servletVersion = "3.1"
+def atomikosVersion = "3.7.0"
+// Properties defined by the build
+def applicationModuleClasses = "${buildDir}/classes/main,${buildDir}/classes/test"
+def applicationLibDir = "lib"
+def applicationResourceFiles = "${testDir}/ejb-jar.xml"
+def embeddedDeploymentMode = "SCATTERED_WAR"
+// properties for javadocs, manifests, etc
+def projectName = "Entity Pruner"
+def projectVendor = "Steven C. Saliman"
+def docWindowTitle = "Entity Pruner Javadoc"
+def docTitle = "&lt;h3&gt;Framework&lt;/h3&gt;"
+def docBottom = "&lt;i&gt;Copyright &amp;#169; 2012 Tracom Group  All Rights Reserved.&lt;/i&gt;"
+def today = new Date()
+
+// Make some sensible defaults for things that were missing values
+if ( !project.hasProperty('defaultLoggingLevel') ) {
+	project.ext.defaultLoggingLevel = "WARN"
+}
+if ( !project.hasProperty('hibernateShowSql') ) {
+	project.ext.hibernateShowSql = "false"
+}
+if ( !project.hasProperty('testPortBase') ) {
+	project.ext.testPortBase = "9000"
+}
+
+defaultTasks 'clean', 'test', 'dist'
+
+// devel adds the devel artifact, the provided lets us set up dependencies 
+// that won't be in the poms
+configurations {
+	provided
+	providedTest
+	archives
+}
+
+artifacts {
+  archives jar
+}
+
+sourceSets {
+	// we need the test resources to be put in the same directory as the test
+	// source, or we won't process the JPA annotations in the test source.
+	main {
+	    compileClasspath = configurations.compile + configurations.provided
+		main.output.resourcesDir = compileJava.destinationDir
+	}
+	test {
+		test.output.resourcesDir = compileTestJava.destinationDir
+		compileClasspath = compileClasspath + configurations.provided +
+						   configurations.providedTest
+		runtimeClasspath = runtimeClasspath + configurations.provided +
+		                   configurations.providedTest
+	}
+}
+
+dependencies {
+	// SLF4j - clients won't work without it
+	compile "org.slf4j:slf4j-api:${slf4jVersion}"
+    compile	"org.slf4j:slf4j-log4j12:${slf4jVersion}"
+	compile "org.slf4j:jcl-over-slf4j:${slf4jVersion}"
+    compile "log4j:log4j:${log4jVersion}"
+
+	// Spring dependencies.  Clients will need these if they want to use
+	// Spring based utilities in the Framework.
+	provided "org.springframework:spring-core:${springVersion}"
+    provided "org.springframework:spring-context-support:${springVersion}"
+    provided "org.springframework:spring-orm:${springVersion}"
+	// Hibernate dependencies.  Clients will need these if they want to use 
+	// The EntityPruner, BaseDao, etc.
+    provided "org.hibernate:hibernate-core:${hibernateVersion}"
+    provided "org.hibernate:hibernate-entitymanager:${hibernateVersion}"
+    provided "net.sf.ehcache:ehcache-core:2.5.0"
+
+	
+
+    provided "commons-io:commons-io:1.3.2"
+
+	// EJB dependencies.  Clients will need this if they want to deploy the
+	// Framework as part of an EJB project.
+	//provided "org.glassfish:javax.ejb:3.1"
+    //provided "org.glassfish:javax.servlet:${servletVersion}"
+    //provided "org.glassfish:javax.servlet.jsp:${servletVersion}"
+    provided "org.glassfish.extras:glassfish-embedded-all:3.1.1"
+
+    // Needed to run tests
+    providedTest "junit:junit:4.10"
+    providedTest "org.apache.tomcat:tomcat-dbcp:7.0.26"
+    providedTest "com.oracle:ojdbc6:10.2.0.4.0"
+    providedTest "mysql:mysql-connector-java:5.1.18"
+    providedTest "com.atomikos:transactions:${atomikosVersion}"
+    providedTest "com.atomikos:transactions-jdbc:${atomikosVersion}"
+    providedTest "com.atomikos:transactions-hibernate3:${atomikosVersion}"
+    providedTest "com.google.guava:guava:10.0.1"
+
+	//testRuntime
+
+	// Dependencies needed to upload to a maven reposotory.
+	archives "org.apache.maven.wagon:wagon-ssh:2.2"
+	archives "org.apache.maven.wagon:wagon-shs-external:2.2"
+
+}
+
+//---------------------------------------------------------------------------
+// Task definitions
+
+// clean
+task myclean(type: Delete) {
+    description "clean"
+	delete "${testResourceDir}/META-INF/persistence.xml"
+	delete "${testResourceDir}/application.properties"
+	delete "${testResourceDir}/applicationContext-test.xml"
+	delete "${testResourceDir}/env.properties"
+	delete "${testResourceDir}/log4j.properties"
+	delete "${embeddedDomainDir}/config/domain.xml"
+	delete "${embeddedDomainDir}/autodeploy"
+	delete "${embeddedDomainDir}/applications"
+	delete "${embeddedDomainDir}/generated"
+	delete "${embeddedDomainDir}/osgi-cache"
+	delete distDir
+	delete "${testLogDir}/${logFilePrefix}.log"
+}
+
+clean.dependsOn << myclean
+
+// Copy template files needed for testing to the test resources directory.
+// This needs to be done to keep IDEs happy
+task prepTest() {
+    description = "Copy resources and files needed for runing tests"
+	requiredProperties "applicationCode", "applicationEnvironment",
+		"applicationName", "oracleDataSource", "mysqlDataSource", 
+		"oracleJdbcDriver", "oracleJdbcUrl", "oracleJdbcUsername", 
+		"oracleJdbcPassword", "mysqlJdbcDriver", "mysqlJdbcUrl", 
+		"mysqlJdbcUsername", "mysqlJdbcPassword", "appLogLevel",
+		"defaultLogLevel", "logFilePrefix", "testLogDir"
+	doFirst {
+		project.ext.filterTokens ['hibernate.show.sql'] = hibernateShowSql
+		// First generate the port numbers we'll need
+		def classes = sourceSets.main.output.classesDir.absolutePath.replaceAll(/\\+/,'/')
+		classes = classes + ','
+		classes = classes + sourceSets.test.output.classesDir.absolutePath.replaceAll(/\\+/,'/')
+		def basePort = testPortBase.toInteger()
+		def testTokens = project.ext.filterTokens + [
+			'remote.debug.port':(basePort + 9).toString(),
+			'iiop.clear.port':(basePort + 37).toString(),
+			'iiop.ssl.port':(basePort + 38).toString(),
+			'iiop.multssl.port':(basePort + 39).toString(),
+			'admin.port':(basePort + 48).toString(),
+			'osgi.telnet.port':(basePort + 66).toString(),
+			'jms.port':(basePort + 76).toString(),
+			'http.port':(basePort + 80).toString(),
+			'https.port':(basePort + 81).toString(),
+			'jmx.port':(basePort + 86).toString(),
+			'test.log.dir':testLogDir,
+			'embedded.deployment.mode':'SCATTERED_WAR',
+			'embedded.domain.dir':embeddedDomainDir.replaceAll(/\\+/, '/'),
+			'embedded.server.dir':embeddedServerDir.replaceAll(/\\+/, '/'),
+			'application.module.classes':classes,
+			'application.lib.dir':testLibDir.replaceAll(/\\+/, '/'),
+			'application.resource.files':"${testDir}/ejb-jar.xml".replaceAll(/\\+/, '/')
+		]
+		println "testTokens=${testTokens}"
+
+		copy { 
+			from templateDir 
+			include 'application.properties', 'application-test.properties',
+					'log4j.properties', 'env.properties'
+			into testResourceDir 
+			filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: testTokens)
+		}
+
+		copy {
+		    from propertyDir
+			include 'applicationContext-test.xml'
+			into testResourceDir
+			filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: testTokens)
+		}
+
+		// Copy the persistence.xml file for IDEs
+		copy {
+			from templateDir
+			include 'persistence.xml'
+			into "${testResourceDir}/META-INF"
+			filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: testTokens)
+		}
+
+		copy {
+			from templateDir
+			include 'domain.xml'
+			into "${embeddedDomainDir}/config"
+			filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: testTokens)
+		}
+	}
+}
+
+// Copy jars from wherever Gradle is finding them to a location where the 
+// embedded GlssFish can find them.
+task copyTestJars {
+    description = "copy test jars"
+	doFirst {
+		configurations.testRuntime.each { file ->
+			// We need to skip the glassfish jar - it needs to come from the
+			// glassfish dir.
+			if ( !file.name.startsWith('glassfish-embedded') ) {
+			    copy {
+				    into testLibDir
+				    from file
+				}
+			}
+		}
+		configurations.provided.each { file ->
+			// We need to skip the glassfish jar - it needs to come from the
+			// glassfish dir.
+			if ( !file.name.startsWith('glassfish-embedded') ) {
+			    copy {
+				    into testLibDir
+				    from file
+				}
+			}
+		}
+	}
+}
+
+test {
+    jvmArgs '-Xmx1024m', '-Xms512m', '-XX:MaxPermSize=256m'
+	//defaulyCharachterEncoding = 'UTF-8'
+	dependsOn << 'copyTestJars'
+}
+
+compileTestJava.dependsOn << 'prepTest'
+processTestResources.dependsOn << 'prepTest'
+jar.requiredProperties "applicationVersion"
+
+jar {
+
+	excludes=[
+		'**/ejb-jar.xml'
+
+	]
+	version = applicationVersion
+	manifest {
+		attributes "Built-By": System.properties.'user.name',
+				   "Implementation-Title": projectName,
+				   "Implementation-Vendor": projectVendor,
+				   "Implementation-Version": "${version} (created ${today})"
+	}
+}
+
+
+
+task dist(dependsOn: jar) {
+	description = "create the distribution"
+	doFirst {
+		// copy jars, make javadoc, etc.
+		println "dist"
+		println "project=${project.name}"
+		println "project=${project.name}"
+	}
+}
+
+
+// Define the standard repositories
+repositories {
+    mavenCentral()
+	mavenLocal()
+}
+
+install {
+    repositories {
+	    mavenInstaller {
+			addFilter('main') { artifact, file ->
+				println "main: ${artifact.name}"
+			    artifact.name == 'entity-pruner'
+			}
+			addFilter('devel') { artifact, file ->
+				println "devel: ${artifact.name}"
+			    artifact.name == 'entity-pruner-devel'
+			}
+			pom('main').groupId = 'com.saliman'
+			pom('main').artifactId = 'entity-pruner'
+			pom('main').version = '3.1.2'
+			pom('devel').groupId = 'com.saliman'
+			pom('devel').artifactId = 'entity-pruner-devel'
+			pom('devel').version = '3.1.2'
+		}
+	}
+}
+
+uploadArchives {
+    repositories {
+	    mavenDeployer {
+			configuration = configurations.archives
+		    repository(url: mavenRepoUploadUrl) {
+			    authentication(userName: "git")
+			}
+			addFilter('main') { artifact, file ->
+				println "main: ${artifact.name}"
+			    artifact.name == 'entity-pruner'
+			}
+			addFilter('devel') { artifact, file ->
+				println "devel: ${artifact.name}"
+			    artifact.name == 'entity-pruner-devel'
+			}
+			pom('main').groupId = 'com.saliman'
+			pom('main').artifactId = 'entity-pruner'
+			pom('main').version = '3.1.2'
+			pom('devel').groupId = 'com.saliman'
+			pom('devel').artifactId = 'entity-pruner-devel'
+			pom('devel').version = '3.1.2'
+		}
+	}
+	doFirst {
+	    configurations.each { c ->
+		    println "Configuration: ${c.name}"
+			c.artifacts.each { a ->
+			    println "  artifact: ${a.name}"
+			}
+		}
+	}
+}
+
+// Idea needs to see all the extra dependencies from our custom configs.
+idea {
+	module {
+		scopes.COMPILE.plus += configurations.provided
+		scopes.TEST.plus += configurations.providedTest
+	}
+}
+
+// Configure Idea plugin so that it generates project files that use git for 
+// source control.  Thank you to Eric Wendelin for showing me this trick.
+idea.project.ipr.withXml { provider ->
+    def node = provider.asNode()
+    def vcsConfig = node.component.find { it.'@name' == 'VcsDirectoryMappings' }
+    vcsConfig.mapping[0].'@vcs' = 'Git'
+
+    // set gradle home
+    def gradleSettings = node.appendNode('component',[name: 'GradleSettings'])
+    gradleSettings.appendNode('option', [name: 'SDK_HOME', value: gradle.gradleHomeDir.absolutePath])
+}
+
