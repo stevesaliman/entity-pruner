@@ -71,10 +71,9 @@ public class EntityUtil {
     
     /**
      * Copies the transient attributes from one entity to another.  This 
-     * is needed when we save an Entity, because the 
-     * {@link BaseDao#save(PrunableEntity)} returns a copy of the original entity,
-     * refreshed from the database, which can cause the transient attributes to
-     * be lost.
+     * is needed when we save an Entity, because DAOs often return a copy of
+     * the original entity, refreshed from the database, which can cause the
+     * transient attributes to be lost.
      * @param source the source entity
      * @param dest the destination entity.
      * @throws IllegalStateException if we can't get one of the values.
