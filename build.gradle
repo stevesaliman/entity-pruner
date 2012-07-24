@@ -146,7 +146,7 @@ dependencies {
 
 	// Dependencies needed to upload to a maven reposotory.
 	archives "org.apache.maven.wagon:wagon-ssh:2.2"
-	archives "org.apache.maven.wagon:wagon-shs-external:2.2"
+	archives "org.apache.maven.wagon:wagon-ssh-external:2.2"
 
 }
 
@@ -278,15 +278,9 @@ test {
 
 compileTestJava.dependsOn << 'prepTest'
 processTestResources.dependsOn << 'prepTest'
-jar.requiredProperties "applicationVersion"
 
 jar {
-
-	excludes=[
-		'**/ejb-jar.xml'
-
-	]
-	version = applicationVersion
+	excludes=['**/ejb-jar.xml']
 	manifest {
 		attributes "Built-By": System.properties.'user.name',
 				   "Implementation-Title": projectName,
@@ -301,6 +295,10 @@ task sourceJar(type: Jar) {
 	from sourceSets.main.java
 }
 
+javadoc {
+	classpath = sourceSets.main.compileClasspath
+}
+
 task javadocJar(type: Jar, dependsOn: "javadoc") {
 	description = "An archive of the javadocs for Maven Central"
 	classifier = "javadoc"
@@ -308,15 +306,9 @@ task javadocJar(type: Jar, dependsOn: "javadoc") {
 }
 
 install {
-    //repositories {
-	    //mavenInstaller {
-			//pom('main').groupId = 'net.saliman'
-			//pom('main').artifactId = 'entity-pruner'
-			//pom('main').version = '3.1.0'
-		//}
-	//}
+	dependsOn(["jar", "javadocJar", "sourceJar"])
 	doLast {
-		// copy things to the dist dir.
+		printf "installed"
 	}
 }
 
@@ -371,7 +363,6 @@ uploadArchives {
                 beforeDeployment { signPom(it) }
             }
             configuration = configurations.archives
-            //repository(url: "file://$buildDir/m2repo")
             repository(url: mavenRepoUploadUrl) {
                 authentication(userName: mavenRepoUsername,
                                password: mavenRepoPassword)
@@ -420,12 +411,12 @@ def getPomConfiguration() {
     return {
         name 'Entity Pruner'
         packaging 'jar'
-        description 'A Utility for making an ORM managed graph safe for sending to a client'
+        description 'A Utility for making an ORM managed object graph safe for sending to a client by pruning out database proxies circular references and other problematic items'
         url 'https://github.com/stevesaliman/entity-pruner'
         licenses {
             license {
-                name 'The Apache Software License, Version 2.0'
-                url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                name 'GNU Lesser General Public License Version 3.0'
+                url 'http://www.gnu.org/licenses/lgpl.html'
                 distribution 'repo'
             }
         }
