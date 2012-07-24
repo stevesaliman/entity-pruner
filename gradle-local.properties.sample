@@ -1,6 +1,6 @@
 # General parameters, like the name and version.
 applicationName=Entity-Pruner
-applicationVersion=3.0.0
+applicationVersion=3.1.0
 # This is the SANE code for this application.
 applicationCode=entityPruner
 # This is the SANE environment for this application.
