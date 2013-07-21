@@ -29,3 +29,15 @@ The Entity Pruner has been tested in Oracle 10 and 11 databases, as well as MySq
 There is one known bug with the EntityPruner: When a client sets a pruned entity's parent to null, when it had a previous value (for example removing an employee from a department), the EntityPruner will restore the value when it unprunes. The workaround is to find and remove the entry in the fieldIdMap for the entity's parent attribute.
 
 Keep an eye on the updates page to see when bugs have been fixed, or features have been added. 
+
+# Building the Entity Pruner
+
+Because the Oracle JDBC jar is not in Maven Central, it must be installed to
+your local Maven repository with ```mvn install:install-file -DgroupId=com.oracle -DartifactId=ojdbc6 -Dversion=10.2.0.4.0 -Dpackaging=jar -Dfile=glassfish-3.1.1/lib/ojdbc6.jar -DgeneratePom=true ``` before the Entity Pruner can be built.
+
+Building from source can be done with ```gradle install```, though unit tests
+can be tricky to run because of the way I'm doing GlassFish in-container
+testing. 
+
+Also note that the cobertura task will currently fail while I resolve a bug
+in Cobertura and/or the Cobertura plugin.
